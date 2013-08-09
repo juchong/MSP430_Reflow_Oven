@@ -17,9 +17,9 @@ display on the fly. A PID controller library is used to control the system.
 
 Attributions
 ========
-+ Lim Phang Moh - http://www.rocketscream.com - Original code off which this program is based
++ Lim Phang Moh - http://www.rocketscream.com - Author of MAX31855 library and original code off which this program is based
 + Brett Beauregard - http://www.brettbeauregard.com - Author of Arduino PID Library used in this program
-+ Limor Fried - http://www.adafruit.com - Author of MAX31855 Library
++ Bill Earl - http://www.adafruit.com - Author of Sous Vide, an excellent self-tuning PID controller example
 
 DISCLAIMER!!!
 ========
@@ -28,8 +28,11 @@ WHEN DEALING WITH THIS HARDWARE BEFORE YOU BEGIN! USE COMMON SENSE WHEN WORKING
 WITH THIS PROJECT. USE OF THIS HARDWARE AND SOFTWARE IS AT YOUR OWN RISK, AND
 WE ARE NOT RESPONSIBLE OR LIABLE FOR ANY DAMAGE TO YOU OR YOUR SURROUNDINGS THAT
 MAY OCCUR OUT OF USE OF THIS AND RELATED MATERIALS!
-THERE IS NO GUARANTEE OF FUNCTION OF THIS CODE IN YOUR PARTICULAR APPLICATION.
-NO WARRANTY ON THIS SOFTWARE IS GUARANTEED NOR IMPLIED.
+
+THIS SOFTWARE IS MADE AVAILABLE "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
+EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF
+CONDITION, UNINTERRUPTED USE, MERCHANTABILITY, FITNESS FOR A PARTICULAR USE, OR
+NON-INFRINGEMENT.
 
 Licenses
 =========
@@ -48,8 +51,8 @@ Required Libraries
   >> https://github.com/b3rttb/Arduino-PID-Library
 - MAX31855 Library (works as is in Energia)
   >> https://github.com/rocketscream/MAX31855
-- FlexiTimer2 Library (works as is in Energia)
-  >> http://www.pjrc.com/teensy/td_libs_MsTimer2.html
+- TwoMsTimer Library (watchdog timer adapted for MSP430)
+  >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
 - LiquidCrystal Library (included in Energia)
 
 Revision History
