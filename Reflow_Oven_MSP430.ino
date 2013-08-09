@@ -325,6 +325,7 @@ void Idle()
     if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC))
       reflowStage = ERROR_PRESENT;
   }
+  detachInterrupt(typeBttn);
   if (solderType)
   {
     lcd.clear();
@@ -377,6 +378,7 @@ void Preheat()
     ovenPID.SetTunings(KP_SOAK, KI_SOAK, KD_SOAK);
     reflowStage = SOAK_STAGE;
   }
+  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -401,6 +403,7 @@ void Soak()
       reflowStage = REFLOW_STAGE;
     }
   }
+  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -419,6 +422,7 @@ void Reflow()
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
   }
+  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -433,6 +437,7 @@ void Cool()
     ovenState = false;
     reflowStage = COMPLETE_STAGE;
   }
+  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -456,6 +461,7 @@ void Complete()
 //    disconnected or something else is wrong.
 void Error()
 {
+  DoControl();
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC))
     reflowStage = ERROR_PRESENT;
   else
