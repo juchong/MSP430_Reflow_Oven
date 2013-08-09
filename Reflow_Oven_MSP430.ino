@@ -18,21 +18,24 @@
 *  Attributions
 *  =============
 * + Lim Phang Moh - http://www.rocketscream.com
-*  Original code off which this program is based
+*  Author of MAX31855 library and original code off which this program is based
 * + Brett Beauregard - http://www.brettbeauregard.com
 *  Author of Arduino PID Library used in this program
-* + Limor Fried - http://www.adafruit.com
-*  Author of MAX31855 Library
+* + Bill Earl - http://www.adafruit.com
+*  Author of Sous Vide, an excellent self-tuning PID controller example
 *
-*  DISCLAIMER!!!
-*  ==============
+*  DISCLAIMERS!!!
+*  ===============
 *  HIGH VOLTAGES ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS YOU ARE DEALING WITH
 *  WHEN DEALING WITH THIS HARDWARE BEFORE YOU BEGIN! USE COMMON SENSE WHEN WORKING
 *  WITH THIS PROJECT. USE OF THIS HARDWARE AND SOFTWARE IS AT YOUR OWN RISK, AND
 *  WE ARE NOT RESPONSIBLE OR LIABLE FOR ANY DAMAGE TO YOU OR YOUR SURROUNDINGS THAT
 *  MAY OCCUR OUT OF USE OF THIS AND RELATED MATERIALS!
-*  THERE IS NO GUARANTEE OF FUNCTION OF THIS CODE IN YOUR PARTICULAR APPLICATION.
-*  NO WARRANTY ON THIS SOFTWARE IS GUARANTEED NOR IMPLIED.
+*
+*  THIS SOFTWARE IS MADE AVAILABLE "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER
+*  EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF
+*  CONDITION, UNINTERRUPTED USE, MERCHANTABILITY, FITNESS FOR A PARTICULAR USE, OR
+*  NON-INFRINGEMENT.
 *
 *  Licenses
 *  =========
@@ -49,36 +52,25 @@
 *    >> https://github.com/b3rttb/Arduino-PID-Library
 * - MAX31855 Library (works as is in Energia)
 *    >> https://github.com/rocketscream/MAX31855
-* - FlexiTimer2 Library (works as is in Energia)
-*    >> http://www.pjrc.com/teensy/td_libs_MsTimer2.html
+* - TwoMsTimer Library (watchdog timer adapted for MSP430)
+*    >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
 * - LiquidCrystal Library (included in Energia)
 *
-*    REVISION HISTORY
-*  Revision  Description
-*  ========  ===========
-*  1.0       Initial release
+*  REVISION HISTORY
+*  =================
+*  1.0 - Initial release
 *
 ***************************************************************************************/
 
-
+//////////////////////////////////////////////
+//   BEGIN INSTANTIATIONS AND DEFINITIONS   //
+//////////////////////////////////////////////
 
 /* LIBRARY INCLUSIONS */
 #include <LiquidCrystal.h>
 #include <MAX31855.h>
 #include <PID_v1.h>
-#include <FlexiTimer2.h>
-
-/* OVEN STATE DEFINITIONS */
-enum REFLOW_STAGE
-{
-  IDLE_STAGE,
-  PREHEAT_STAGE,
-  SOAK_STAGE,
-  REFLOW_STAGE,
-  COOL_STAGE,
-  COMPLETE_STAGE,
-  ERROR_PRESENT,
-};
+#include <TwoMsTimer.h>
 
 /* PID CONTROLLER PARAMETERS - CONSTANTS */
 #define SAMPLE_TIME 1000
@@ -94,6 +86,18 @@ enum REFLOW_STAGE
 #define KP_REFLOW 300
 #define KI_REFLOW 0.05
 #define KD_REFLOW 350
+
+/* REFLOW STAGE DEFINITIONS */
+typedef enum REFLOW_STAGE
+{
+  IDLE_STAGE,
+  PREHEAT_STAGE,
+  SOAK_STAGE,
+  REFLOW_STAGE,
+  COOL_STAGE,
+  COMPLETE_STAGE,
+  ERROR_PRESENT
+};
 
 /* PID CONTROLLER PARAMETERS - VARIABLES */
 double setpoint;
@@ -119,7 +123,7 @@ const char* lcdStageMessages[] = {
 };
 
 /* DEGREE SYMBOL DEF */
-unsigned byte degree[8] = {
+byte degree[8] = {
   B001100,
   B010010,
   B010010,
@@ -155,7 +159,7 @@ int typeBttn = 5;
 int startstopBttn = 6;
 
 /* STATE VARIABLE INSTANTIATIONS */
-REFLOW_STAGE reflowStage = IDLE_STAGE;
+enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 boolean ovenState = false;
 
 /* INSTANTIATE PID CONTROLLER */
@@ -167,11 +171,11 @@ MAX31855 thermo(thermoSO, thermoCS, thermoCLK);
 
 /* DEFINING BUTTON INTERRUPT VARIABLES */
 boolean solderType = true;
-long debouncingTime = 30; // Software debouncing time in ms
-volatile unsigned long lastMicros;
+long debounceTime = 30; // Software debouncing time in ms
+volatile unsigned long last_micros = 0;
 
 //////////////////////////////////////////////
-//        BEGIN CODE METHOD BLOCKS          //
+//         BEGIN CODE METHOD BLOCKS         //
 //////////////////////////////////////////////
 
 //////////////////////////////////////////////
@@ -189,8 +193,8 @@ void setup()
   
   // Start-up Splash Screen
   lcd.begin(8, 2);
-  lcd.createChar(0, degree);
   lcd.clear();
+  lcd.createChar(1, degree);
   lcd.print("Reflow Oven 1.0");
   lcd.setCursor(0,1);
   lcd.print("MSP430-TI In it");
@@ -198,8 +202,11 @@ void setup()
   lcd.clear();
   
   // Begin Time Keeping
-  FlexiTimer2::set(500, InterruptHandler);
-  FlexiTimer2::start();
+  TwoMsTimer::set(500, InterruptHandler);
+  TwoMsTimer::start();
+  
+  // Attach START/STOP interrupt to the button
+  attachInterrupt(startstopBttn, StartStop, FALLING);
 }
 
 ///////////////////////////////////////////////////
@@ -269,25 +276,25 @@ void DriveOutput()
   long now = millis();
   // Set the output
   // "on time" is proportional to the PID output
-  if(now - windowStartTime>WindowSize)
+  if(now - windowStartTime > windowSize)
   { //time to shift the Relay Window
-    windowStartTime += WindowSize;
+    windowStartTime += windowSize;
   }
   if((onTime > 100) && (onTime > (now - windowStartTime)))
   {
-    digitalWrite(RelayPin,HIGH);
+    digitalWrite(relayPin,HIGH);
   }
   else
   {
-    digitalWrite(RelayPin,LOW);
+    digitalWrite(relayPin,LOW);
   }
   if (reflowStage != IDLE_STAGE)
   {
     lcd.clear();
-    lcd.print(lcdStageMessages[reflowStage];
+    lcd.print(lcdStageMessages[reflowStage]);
     lcd.setCursor(0,1);
     lcd.print(input);
-    lcd.print(0, BYTE);
+    lcd.write(1);
   }
 }
 
@@ -313,7 +320,6 @@ void Idle()
   lcd.clear();
   lcd.print("Select Solder");
   attachInterrupt(typeBttn, SolderSelect, FALLING);
-  attachInterrupt(startstopBttn, StartStop, FALLING);
   while(!ovenState)
   {
     if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC))
@@ -408,7 +414,7 @@ void Reflow()
 {
   // Need to avoid hovering at the peak temp for too long...
   // Crude method but works and is safe for components
-  if (input >= (REFLOW_MAX - 5)
+  if (input >= (REFLOW_MAX - 5))
   {
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
@@ -456,3 +462,59 @@ void Error()
     reflowStage = IDLE_STAGE;
 }
 
+//////////////////////////////////////////////
+// SolderSelect
+//    This function handles the software
+//    debouncing of the solder selection bttn.
+//    It also toggles the solder profile
+//    variable and prints the current
+//    selection to the LCD screen.
+void SolderSelect()
+{
+  if((long)(micros() - last_micros) >= debounceTime * 1000)
+  {
+    lcd.clear();
+    solderType = !solderType;
+    if (solderType)
+    {
+      lcd.print("LEAD");
+      lcd.setCursor(0,1);
+      lcd.print("START when rdy");
+    }
+    else
+    {
+      lcd.print("LEAD-FREE");
+      lcd.setCursor(0,1);
+      lcd.print("START when rdy");
+    }
+    last_micros = micros();
+  }
+}
+
+//////////////////////////////////////////////
+// StartStop
+//    This function handles the software
+//    debouncing of the Start/Stop button, as
+//    well as handling the setting of the
+//    ovenState variable. If toggled off during
+//    the reflow process, it will also properly
+//    set the stage to COOL_STAGE to allow the
+//    oven to cool off before opening the door.
+void StartStop()
+{
+  if ((long)(micros() - last_micros) > debounceTime * 1000)
+  {
+    if (ovenState)
+    {
+      ovenState = false;
+      setpoint = COOL_MIN;
+      ovenPID.SetTunings(KP_REFLOW, KI_REFLOW, KD_REFLOW);
+      reflowStage = COOL_STAGE;
+    }
+    else
+    {
+      ovenState = true;
+    }
+    last_micros = micros();
+  }
+}
