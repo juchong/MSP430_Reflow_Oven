@@ -188,8 +188,8 @@ void setup()
   pinMode(relayPin, OUTPUT);
   
   // Setting control button modes
-  pinMode(typeBttn, INPUT);
-  pinMode(startstopBttn, INPUT);
+  pinMode(typeBttn, INPUT_PULLUP);
+  pinMode(startstopBttn, INPUT_PULLUP);
   
   // Start-up Splash Screen
   lcd.begin(8, 2);
