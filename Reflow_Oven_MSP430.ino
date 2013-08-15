@@ -103,7 +103,7 @@ typedef enum REFLOW_STAGE
 double setpoint;
 double input;
 double output;
-int windowSize;
+int windowSize = 5000;
 unsigned long windowStartTime;
 volatile long onTime = 0;
 double kp;
@@ -117,7 +117,7 @@ const char* lcdStageMessages[] = {
   "PRE-HEAT",
   "SOAK",
   "REFLOW",
-  "COOL",
+  "COOLING",
   "COMPLETE",
   "ERROR"
 };
@@ -145,12 +145,12 @@ int COOL_MIN;
 int SAMPLING_TIME;
 
 /* PIN ASSIGNMENT */
-int relayPin = 19;
+int relayPin = 2;
 int thermoSO = 15;
 int thermoCS = 8;
 int thermoCLK = 7;
 int lcdRs = 18;
-int lcdE = 4;
+int lcdE = 19;
 int lcdD4 = 9;
 int lcdD5 = 10;
 int lcdD6 = 11;
@@ -169,10 +169,9 @@ LiquidCrystal lcd(lcdRs, lcdE, lcdD4, lcdD5, lcdD6, lcdD7);
 /* INSTANTIATE THERMOCOUPLE INTERFACE */
 MAX31855 thermo(thermoSO, thermoCS, thermoCLK);
 
-/* DEFINING BUTTON INTERRUPT VARIABLES */
+/* DEFINING SOLDER TYPE VARIABLE*/
+/* true means lead, false means lead-free */
 boolean solderType = true;
-long debounceTime = 30; // Software debouncing time in ms
-volatile unsigned long last_micros = 0;
 
 //////////////////////////////////////////////
 //         BEGIN CODE METHOD BLOCKS         //
@@ -187,17 +186,20 @@ void setup()
   digitalWrite(relayPin, LOW);
   pinMode(relayPin, OUTPUT);
   
+  // Start Serial monitor, for debugging
+  Serial.begin(9600);
+  
   // Setting control button modes
   pinMode(typeBttn, INPUT_PULLUP);
   pinMode(startstopBttn, INPUT_PULLUP);
   
   // Start-up Splash Screen
   lcd.begin(8, 2);
-  lcd.clear();
   lcd.createChar(1, degree);
+  lcd.clear();
   lcd.print("Reflow Oven 1.0");
   lcd.setCursor(0,1);
-  lcd.print("MSP430-TI In it");
+  lcd.print("MSP430-TI In It");
   delay(2500);
   lcd.clear();
   
@@ -207,6 +209,14 @@ void setup()
   
   // Attach START/STOP interrupt to the button
   attachInterrupt(startstopBttn, StartStop, FALLING);
+  
+  // Start Solder Select process screen
+  lcd.clear();
+  lcd.print("Select Solder");
+  lcd.setCursor(0,1);
+  lcd.print("(Lead = Default)");
+  delay(3000);
+//  attachInterrupt(typeBttn, SolderSelect, FALLING);
 }
 
 ///////////////////////////////////////////////////
@@ -217,6 +227,9 @@ void setup()
 //    active.
 void loop()
 {
+  DoControl();
+  if (!ovenState)
+    reflowStage = IDLE_STAGE;
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -250,16 +263,24 @@ void loop()
 //    make the next computation (if oven state
 //    is true) or to ensure oven is switched
 //    off. It is called every 15ms as called
-//    by the watchdog timer in FlexiTimer2
+//    by the watchdog timer in TwoMsTimer.
 void InterruptHandler()
 {
-  if (!ovenState)
+  if(reflowStage != IDLE_STAGE)
   {
-    digitalWrite(relayPin, LOW);
+    lcd.clear();
+    lcd.print(lcdStageMessages[reflowStage]);
+  }
+  lcd.setCursor(0,1);
+  lcd.print(input);
+  lcd.write(1);
+  if (ovenState)
+  {
+    DriveOutput();
   }
   else
   {
-    DriveOutput();
+    digitalWrite(relayPin, LOW);
   }
 }
 
@@ -273,6 +294,7 @@ void InterruptHandler()
 //    current temperature and reflow stage.
 void DriveOutput()
 {
+  Serial.println(output);
   long now = millis();
   // Set the output
   // "on time" is proportional to the PID output
@@ -280,21 +302,13 @@ void DriveOutput()
   { //time to shift the Relay Window
     windowStartTime += windowSize;
   }
-  if((onTime > 100) && (onTime > (now - windowStartTime)))
+  if(output > (now - windowStartTime))
   {
     digitalWrite(relayPin,HIGH);
   }
   else
   {
     digitalWrite(relayPin,LOW);
-  }
-  if (reflowStage != IDLE_STAGE)
-  {
-    lcd.clear();
-    lcd.print(lcdStageMessages[reflowStage]);
-    lcd.setCursor(0,1);
-    lcd.print(input);
-    lcd.write(1);
   }
 }
 
@@ -307,7 +321,6 @@ void DoControl()
 {
   input = thermo.readThermocouple(CELSIUS);
   ovenPID.Compute();
-  onTime = output;
 }
 
 //////////////////////////////////////////////
@@ -316,51 +329,72 @@ void DoControl()
 //    stage. It is where the temperature
 //    profile is chosen.
 void Idle()
-{
-  lcd.clear();
-  lcd.print("Select Solder");
-  attachInterrupt(typeBttn, SolderSelect, FALLING);
-  while(!ovenState)
+{  
+  while (!ovenState)
   {
-    if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC))
-      reflowStage = ERROR_PRESENT;
+    DoControl();
+    if (!digitalRead(typeBttn))
+    {
+      delay(10);
+      if (!digitalRead(typeBttn))
+      {
+        lcd.clear();
+        solderType = !solderType;
+        if (solderType)
+        {
+          lcd.print("LEAD");
+          lcd.setCursor(0,1);
+          lcd.print(input);
+          lcd.write(1);
+        }  
+        else
+        {
+          lcd.print("LEAD-FREE");
+          lcd.setCursor(0,1);
+          lcd.print(input);
+          lcd.write(1);
+        }
+      }
+    }
   }
-  detachInterrupt(typeBttn);
-  if (solderType)
+  if(ovenState)
   {
-    lcd.clear();
-    lcd.print("Lead Set");
-    ROOM = 50;
-    SOAK_MIN = 135;
-    SOAK_MAX = 155;
-    REFLOW_MAX = 225;
-    COOL_MIN = 100;
-    SAMPLING_TIME = 1000;
-    SOAK_STEP = 6;
-    SOAK_MICRO_PERIOD = 9000;
+    if (solderType)
+    {
+      lcd.clear();
+      lcd.print("Lead Set");
+      ROOM = 50;
+      SOAK_MIN = 135;
+      SOAK_MAX = 155;
+      REFLOW_MAX = 225;
+      COOL_MIN = 100;
+      SAMPLING_TIME = 1000;
+      SOAK_STEP = 6;
+      SOAK_MICRO_PERIOD = 9000;
+    }
+    else
+    {
+      lcd.clear();
+      lcd.print("Lead-Free Set");
+      ROOM = 50;
+      SOAK_MIN = 150;
+      SOAK_MAX = 200;
+      REFLOW_MAX = 250;
+      COOL_MIN = 100;
+      SAMPLING_TIME = 1000;
+      SOAK_STEP = 5;
+      SOAK_MICRO_PERIOD = 9000;
+    }
+    delay(3000);
+    windowStartTime = millis();
+    setpoint = SOAK_MIN;
+    ovenPID.SetOutputLimits(0, windowSize);
+    ovenPID.SetSampleTime(SAMPLING_TIME);
+    ovenPID.SetTunings(KP_PREHEAT, KI_PREHEAT, KD_PREHEAT);
+    ovenPID.SetMode(AUTOMATIC);
+    DoControl();
+    reflowStage = PREHEAT_STAGE;
   }
-  else
-  {
-    lcd.clear();
-    lcd.print("Lead-Free Set");
-    ROOM = 50;
-    SOAK_MIN = 150;
-    SOAK_MAX = 200;
-    REFLOW_MAX = 250;
-    COOL_MIN = 100;
-    SAMPLING_TIME = 1000;
-    SOAK_STEP = 5;
-    SOAK_MICRO_PERIOD = 9000;
-  }
-  delay(3000);
-  windowStartTime = millis();
-  setpoint = SOAK_MIN;
-  ovenPID.SetOutputLimits(0, windowSize);
-  ovenPID.SetSampleTime(SAMPLING_TIME);
-  ovenPID.SetTunings(KP_PREHEAT, KI_PREHEAT, KD_PREHEAT);
-  ovenPID.SetMode(AUTOMATIC);
-  ovenState = true;
-  reflowStage = PREHEAT_STAGE;
 }
 
 //////////////////////////////////////////////
@@ -371,6 +405,7 @@ void Idle()
 //    to move into the soaking stage.
 void Preheat()
 {
+  DoControl();
   if (input >= SOAK_MIN)
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
@@ -378,7 +413,6 @@ void Preheat()
     ovenPID.SetTunings(KP_SOAK, KI_SOAK, KD_SOAK);
     reflowStage = SOAK_STAGE;
   }
-  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -392,18 +426,18 @@ void Preheat()
 //    setpoints are updated for REFLOW stage.
 void Soak()
 {
+  DoControl();
   if (millis() > timerSoak)
   {
-    timerSoak += SOAK_MICRO_PERIOD;
+    timerSoak = millis() + SOAK_MICRO_PERIOD;
     setpoint += SOAK_STEP;
-    if (setpoint > SOAK_MAX)
+    if (input > SOAK_MAX)
     {
       ovenPID.SetTunings(KP_REFLOW, KI_REFLOW, KD_REFLOW);
       setpoint = REFLOW_MAX;
       reflowStage = REFLOW_STAGE;
     }
   }
-  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -417,12 +451,12 @@ void Reflow()
 {
   // Need to avoid hovering at the peak temp for too long...
   // Crude method but works and is safe for components
-  if (input >= (REFLOW_MAX - 5))
+  DoControl();
+  if (input >= (REFLOW_MAX))
   {
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
   }
-  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -432,12 +466,13 @@ void Reflow()
 //    enough to open the door.
 void Cool()
 {
+  ovenState = false;
+  DoControl();
   if (input <= COOL_MIN)
   {
     ovenState = false;
     reflowStage = COMPLETE_STAGE;
   }
-  DoControl();
 }
 
 //////////////////////////////////////////////
@@ -475,27 +510,27 @@ void Error()
 //    It also toggles the solder profile
 //    variable and prints the current
 //    selection to the LCD screen.
-void SolderSelect()
-{
-  if((long)(micros() - last_micros) >= debounceTime * 1000)
-  {
-    lcd.clear();
-    solderType = !solderType;
-    if (solderType)
-    {
-      lcd.print("LEAD");
-      lcd.setCursor(0,1);
-      lcd.print("START when rdy");
-    }
-    else
-    {
-      lcd.print("LEAD-FREE");
-      lcd.setCursor(0,1);
-      lcd.print("START when rdy");
-    }
-    last_micros = micros();
-  }
-}
+//void SolderSelect()
+//{
+//  if((long)(micros() - last_micros) >= debounceTime * 1000)
+//  {
+//    lcd.clear();
+//    solderType = !solderType;
+//    if (solderType)
+//    {
+//      lcd.print("LEAD");
+//      lcd.setCursor(0,1);
+//      lcd.print("START when rdy");
+//    }
+//    else
+//    {
+//      lcd.print("LEAD-FREE");
+//      lcd.setCursor(0,1);
+//      lcd.print("START when rdy");
+//    }
+//    last_micros = micros();
+//  }
+//}
 
 //////////////////////////////////////////////
 // StartStop
@@ -503,24 +538,15 @@ void SolderSelect()
 //    debouncing of the Start/Stop button, as
 //    well as handling the setting of the
 //    ovenState variable. If toggled off during
-//    the reflow process, it will also properly
-//    set the stage to COOL_STAGE to allow the
-//    oven to cool off before opening the door.
+//    the reflow process, it will also set the
+//    stage to IDLE_STAGE.
 void StartStop()
 {
-  if ((long)(micros() - last_micros) > debounceTime * 1000)
+  delayMicroseconds(20000);
+  if(!digitalRead(startstopBttn))
   {
-    if (ovenState)
-    {
-      ovenState = false;
-      setpoint = COOL_MIN;
-      ovenPID.SetTunings(KP_REFLOW, KI_REFLOW, KD_REFLOW);
-      reflowStage = COOL_STAGE;
-    }
-    else
-    {
-      ovenState = true;
-    }
-    last_micros = micros();
+    ovenState = !ovenState;
+    if(!ovenState)
+      reflowStage = IDLE_STAGE;
   }
 }
