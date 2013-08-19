@@ -103,7 +103,7 @@ typedef enum REFLOW_STAGE
 double setpoint;
 double input;
 double output;
-int windowSize = 5000;
+int windowSize = 2000;
 unsigned long windowStartTime;
 volatile long onTime = 0;
 double kp;
@@ -211,12 +211,13 @@ void setup()
   attachInterrupt(startstopBttn, StartStop, FALLING);
   
   // Start Solder Select process screen
-  lcd.clear();
-  lcd.print("Select Solder");
-  lcd.setCursor(0,1);
-  lcd.print("(Lead = Default)");
-  delay(3000);
-//  attachInterrupt(typeBttn, SolderSelect, FALLING);
+//  lcd.clear();
+//  lcd.print("Select Solder");
+//  lcd.setCursor(0,1);
+//  lcd.print("(Lead = Default)");
+//  delay(3000);
+//  lcd.setCursor(0,1);
+//  lcd.print("                ");
 }
 
 ///////////////////////////////////////////////////
@@ -228,8 +229,8 @@ void setup()
 void loop()
 {
   DoControl();
-//  if (!ovenState)
-//    reflowStage = IDLE_STAGE;
+  if (!ovenState)
+    reflowStage = IDLE_STAGE;
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -274,7 +275,7 @@ void InterruptHandler()
   lcd.setCursor(0,1);
   lcd.print(input);
   lcd.write(1);
-  lcd.print("     ");
+  lcd.print("C    ");
   if (ovenState)
   {
     DriveOutput();
@@ -331,12 +332,19 @@ void DoControl()
 //    profile is chosen.
 void Idle()
 {  
+  lcd.clear();
+  lcd.print("Select Solder");
+  lcd.setCursor(0,1);
+  lcd.print("(Lead = Default)");
+  delay(3000);
+  lcd.setCursor(0,1);
+  lcd.print("                ");
   while (!ovenState)
   {
     DoControl();
     if (!digitalRead(typeBttn))
     {
-      delay(10);
+      delay(40);
       if (!digitalRead(typeBttn))
       {
         lcd.clear();
@@ -469,9 +477,8 @@ void Cool()
 {
 //  ovenState = false;
   DoControl();
-  if (input <= COOL_MIN)
+  if (input <= 5)
   {
-    ovenState = false;
     reflowStage = COMPLETE_STAGE;
   }
 }
@@ -485,8 +492,9 @@ void Cool()
 //    out of the oven.
 void Complete()
 {
-  delay(10000);
+  delay(5000);
   reflowStage = IDLE_STAGE;
+  ovenState = false;
 }
 
 //////////////////////////////////////////////
@@ -514,7 +522,7 @@ void Error()
 //    stage to IDLE_STAGE.
 void StartStop()
 {
-  delayMicroseconds(20000);
+  delayMicroseconds(40000);
   if(!digitalRead(startstopBttn))
   {
     ovenState = !ovenState;
