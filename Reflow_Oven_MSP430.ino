@@ -228,8 +228,8 @@ void setup()
 void loop()
 {
   DoControl();
-  if (!ovenState)
-    reflowStage = IDLE_STAGE;
+//  if (!ovenState)
+//    reflowStage = IDLE_STAGE;
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -274,6 +274,7 @@ void InterruptHandler()
   lcd.setCursor(0,1);
   lcd.print(input);
   lcd.write(1);
+  lcd.print("     ");
   if (ovenState)
   {
     DriveOutput();
@@ -466,7 +467,7 @@ void Reflow()
 //    enough to open the door.
 void Cool()
 {
-  ovenState = false;
+//  ovenState = false;
   DoControl();
   if (input <= COOL_MIN)
   {
@@ -502,35 +503,6 @@ void Error()
   else
     reflowStage = IDLE_STAGE;
 }
-
-//////////////////////////////////////////////
-// SolderSelect
-//    This function handles the software
-//    debouncing of the solder selection bttn.
-//    It also toggles the solder profile
-//    variable and prints the current
-//    selection to the LCD screen.
-//void SolderSelect()
-//{
-//  if((long)(micros() - last_micros) >= debounceTime * 1000)
-//  {
-//    lcd.clear();
-//    solderType = !solderType;
-//    if (solderType)
-//    {
-//      lcd.print("LEAD");
-//      lcd.setCursor(0,1);
-//      lcd.print("START when rdy");
-//    }
-//    else
-//    {
-//      lcd.print("LEAD-FREE");
-//      lcd.setCursor(0,1);
-//      lcd.print("START when rdy");
-//    }
-//    last_micros = micros();
-//  }
-//}
 
 //////////////////////////////////////////////
 // StartStop
