@@ -15,14 +15,6 @@
 *  the MAX31855 thermocouple chip and library and an on-board LCD screen for status
 *  display on the fly. A PID controller library is used to control the system.
 *
-*  Basic Usage
-*  ============
-*  When the unit is first started, it will display the splash screen and prompt the
-*  user to select a solder type - lead or lead-free. The default is lead solder.
-*  If the user wishes to run the lead-free profile, press and hold the Solder Select
-*  button on the BoosterPack or Shield (depending on if you have a Launchpad or
-*  Arduino.
-*
 *  Attributions
 *  =============
 * + Lim Phang Moh - http://www.rocketscream.com
@@ -65,7 +57,7 @@
 * - Timer1 Library (use this if you are using the Arduino and Shield)
 *    >> http://playground.arduino.cc/code/timer1
 * - LiquidCrystal Library (included in both development environments)
-*
+
 *  REVISION HISTORY
 *  =================
 *  1.0 - Initial release
