@@ -15,6 +15,14 @@
 *  the MAX31855 thermocouple chip and library and an on-board LCD screen for status
 *  display on the fly. A PID controller library is used to control the system.
 *
+*  Basic Usage
+*  ============
+*  When the unit is first started, it will display the splash screen and prompt the
+*  user to select a solder type - lead or lead-free. The default is lead solder.
+*  If the user wishes to run the lead-free profile, press and hold the Solder Select
+*  button on the BoosterPack or Shield (depending on if you have a Launchpad or
+*  Arduino.
+*
 *  Attributions
 *  =============
 * + Lim Phang Moh - http://www.rocketscream.com
@@ -48,13 +56,15 @@
 *
 *  Required Libraries
 *  ===================
-* - Arduino PID Library: (works as is in Energia)
+* - Arduino PID Library: (cross-platform compatible)
 *    >> https://github.com/b3rttb/Arduino-PID-Library
-* - MAX31855 Library (works as is in Energia)
+* - MAX31855 Library (cross-platform compatible)
 *    >> https://github.com/rocketscream/MAX31855
-* - TwoMsTimer Library (watchdog timer adapted for MSP430)
+* - TwoMsTimer Library (use this if you are using the MSP430 Launchpad and Boosterpack)
 *    >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
-* - LiquidCrystal Library (included in Energia)
+* - Timer1 Library (use this if you are using the Arduino and Shield)
+*    >> http://playground.arduino.cc/code/timer1
+* - LiquidCrystal Library (included in both development environments)
 *
 *  REVISION HISTORY
 *  =================
@@ -119,7 +129,7 @@ const char* lcdStageMessages[] = {
   "REFLOW",
   "COOLING",
   "COMPLETE",
-  "ERROR"
+  "SENSOR ERROR"
 };
 
 /* DEGREE SYMBOL DEF */
@@ -204,6 +214,8 @@ void setup()
   lcd.clear();
   
   // Begin Time Keeping
+  //   Replace these with the relevant commands from Timer1 for Arduino
+  //   to interrupt every 500 ms
   TwoMsTimer::set(500, InterruptHandler);
   TwoMsTimer::start();
   
@@ -229,8 +241,6 @@ void setup()
 void loop()
 {
   DoControl();
-  if (!ovenState)
-    reflowStage = IDLE_STAGE;
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -332,6 +342,11 @@ void DoControl()
 //    profile is chosen.
 void Idle()
 {  
+  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
+  {
+    reflowStage = ERROR_PRESENT;
+    return;
+  }
   lcd.clear();
   lcd.print("Select Solder");
   lcd.setCursor(0,1);
@@ -339,13 +354,20 @@ void Idle()
   delay(3000);
   lcd.setCursor(0,1);
   lcd.print("                ");
+  
   while (!ovenState)
   {
+    // Setting up temporary variable for debouncing
+    int pressConfLvl = 0;
+
     DoControl();
-    if (!digitalRead(typeBttn))
+    while (!digitalRead(typeBttn))
     {
-      delay(40);
-      if (!digitalRead(typeBttn))
+      // Increment button confidence counter
+      pressConfLvl++;
+      //  If by now the counter has reached 200, button
+      //  should be pressed and not actually bouncing
+      if (pressConfLvl > 32000)
       {
         lcd.clear();
         solderType = !solderType;
@@ -355,6 +377,7 @@ void Idle()
           lcd.setCursor(0,1);
           lcd.print(input);
           lcd.write(1);
+          lcd.print("C");
         }  
         else
         {
@@ -362,7 +385,9 @@ void Idle()
           lcd.setCursor(0,1);
           lcd.print(input);
           lcd.write(1);
+          lcd.print("C");
         }
+        pressConfLvl = 0;
       }
     }
   }
@@ -505,11 +530,15 @@ void Complete()
 //    disconnected or something else is wrong.
 void Error()
 {
+  detachInterrupt(startstopBttn);
   DoControl();
-  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC))
+  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
     reflowStage = ERROR_PRESENT;
   else
+  {
     reflowStage = IDLE_STAGE;
+    attachInterrupt(startstopBttn, StartStop, FALLING);
+  }
 }
 
 //////////////////////////////////////////////
