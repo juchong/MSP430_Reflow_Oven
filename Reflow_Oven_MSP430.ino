@@ -15,6 +15,14 @@
 *  the MAX31855 thermocouple chip and library and an on-board LCD screen for status
 *  display on the fly. A PID controller library is used to control the system.
 *
+*  Basic Usage
+*  ============
+*  When the unit is first started, it will display the splash screen and prompt the
+*  user to select a solder type - lead or lead-free. The default is lead solder.
+*  If the user wishes to run the lead-free profile, press and hold the Solder Select
+*  button on the BoosterPack or Shield (depending on if you have a Launchpad or
+*  Arduino.
+*
 *  Attributions
 *  =============
 * + Lim Phang Moh - http://www.rocketscream.com
@@ -57,7 +65,7 @@
 * - Timer1 Library (use this if you are using the Arduino and Shield)
 *    >> http://playground.arduino.cc/code/timer1
 * - LiquidCrystal Library (included in both development environments)
-
+*
 *  REVISION HISTORY
 *  =================
 *  1.0 - Initial release
@@ -213,15 +221,6 @@ void setup()
   
   // Attach START/STOP interrupt to the button
   attachInterrupt(startstopBttn, StartStop, FALLING);
-  
-  // Start Solder Select process screen
-//  lcd.clear();
-//  lcd.print("Select Solder");
-//  lcd.setCursor(0,1);
-//  lcd.print("(Lead = Default)");
-//  delay(3000);
-//  lcd.setCursor(0,1);
-//  lcd.print("                ");
 }
 
 ///////////////////////////////////////////////////
@@ -278,6 +277,14 @@ void InterruptHandler()
   lcd.print(input);
   lcd.write(1);
   lcd.print("C    ");
+  if(solderType)
+  {
+    lcd.print("Lead");
+  }
+  else
+  {
+    lcd.print("Lead-free");
+  }
   if (ovenState)
   {
     DriveOutput();
@@ -334,6 +341,7 @@ void DoControl()
 //    profile is chosen.
 void Idle()
 {  
+  DoControl();
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
@@ -341,12 +349,6 @@ void Idle()
   }
   lcd.clear();
   lcd.print("Select Solder");
-  lcd.setCursor(0,1);
-  lcd.print("(Lead = Default)");
-  delay(3000);
-  lcd.setCursor(0,1);
-  lcd.print("                ");
-  
   while (!ovenState)
   {
     // Setting up temporary variable for debouncing
@@ -432,6 +434,11 @@ void Idle()
 void Preheat()
 {
   DoControl();
+  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
+  {
+    reflowStage = ERROR_PRESENT;
+    return;
+  }
   if (input >= SOAK_MIN)
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
@@ -453,6 +460,12 @@ void Preheat()
 void Soak()
 {
   DoControl();
+  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
+  {
+    reflowStage = ERROR_PRESENT;
+    return;
+  }
+
   if (millis() > timerSoak)
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
@@ -475,9 +488,12 @@ void Soak()
 //    stage.
 void Reflow()
 {
-  // Need to avoid hovering at the peak temp for too long...
-  // Crude method but works and is safe for components
   DoControl();
+  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
+  {
+    reflowStage = ERROR_PRESENT;
+    return;
+  }
   if (input >= (REFLOW_MAX))
   {
     setpoint = COOL_MIN;
@@ -492,9 +508,8 @@ void Reflow()
 //    enough to open the door.
 void Cool()
 {
-//  ovenState = false;
   DoControl();
-  if (input <= 5)
+  if (input <= 60)
   {
     reflowStage = COMPLETE_STAGE;
   }
