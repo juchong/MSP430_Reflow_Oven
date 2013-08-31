@@ -110,12 +110,14 @@ typedef enum REFLOW_STAGE
 };
 
 /* PID CONTROLLER PARAMETERS - VARIABLES */
+//  If your oven happens to be overshooting,
+//  increase the windowSize variable below.
+//  If it's undershooting, decrease it.
 double setpoint;
 double input;
 double output;
-int windowSize = 2000;
+int windowSize = 1500;
 unsigned long windowStartTime;
-volatile long onTime = 0;
 double kp;
 double ki;
 double kd;
@@ -123,7 +125,7 @@ unsigned long timerSoak;
 
 /* LCD MESSAGES */
 const char* lcdStageMessages[] = {
-  "READY",
+  "Select Solder",
   "PRE-HEAT",
   "SOAK",
   "REFLOW",
@@ -231,6 +233,15 @@ void setup()
 //    active.
 void loop()
 {
+  // The following if statement code ensures that the
+  //  oven is in the IDLE_STAGE if set to off. It will
+  //  also shut the oven off if it reaches 265C in error
+  //  to prevent internal damage.
+  if (!ovenState || input >= 265)
+  {
+    ovenState = false;
+    reflowStage = IDLE_STAGE;
+  }
   DoControl();
   switch (reflowStage)
   {
@@ -268,22 +279,19 @@ void loop()
 //    by the watchdog timer in TwoMsTimer.
 void InterruptHandler()
 {
-  if(reflowStage != IDLE_STAGE)
-  {
-    lcd.clear();
-    lcd.print(lcdStageMessages[reflowStage]);
-  }
+  lcd.clear();
+  lcd.print(lcdStageMessages[reflowStage]);
   lcd.setCursor(0,1);
   lcd.print(input);
   lcd.write(1);
-  lcd.print("C    ");
+  lcd.print("C ");
   if(solderType)
   {
     lcd.print("Lead");
   }
   else
   {
-    lcd.print("Lead-free");
+    lcd.print("No Lead");
   }
   if (ovenState)
   {
@@ -307,8 +315,6 @@ void DriveOutput()
 {
   Serial.println(output);
   long now = millis();
-  // Set the output
-  // "on time" is proportional to the PID output
   if(now - windowStartTime > windowSize)
   { //time to shift the Relay Window
     windowStartTime += windowSize;
@@ -359,28 +365,13 @@ void Idle()
     {
       // Increment button confidence counter
       pressConfLvl++;
-      //  If by now the counter has reached 200, button
-      //  should be pressed and not actually bouncing
+      //  If by now the counter has reached 32000, button
+      //  should be pressed and not just bouncing
       if (pressConfLvl > 32000)
       {
         lcd.clear();
         solderType = !solderType;
-        if (solderType)
-        {
-          lcd.print("LEAD");
-          lcd.setCursor(0,1);
-          lcd.print(input);
-          lcd.write(1);
-          lcd.print("C");
-        }  
-        else
-        {
-          lcd.print("LEAD-FREE");
-          lcd.setCursor(0,1);
-          lcd.print(input);
-          lcd.write(1);
-          lcd.print("C");
-        }
+        // Reset the counter for the next button press
         pressConfLvl = 0;
       }
     }
@@ -389,31 +380,26 @@ void Idle()
   {
     if (solderType)
     {
-      lcd.clear();
-      lcd.print("Lead Set");
       ROOM = 50;
       SOAK_MIN = 135;
       SOAK_MAX = 155;
       REFLOW_MAX = 225;
-      COOL_MIN = 100;
+      COOL_MIN = 50;
       SAMPLING_TIME = 1000;
       SOAK_STEP = 6;
       SOAK_MICRO_PERIOD = 9000;
     }
     else
     {
-      lcd.clear();
-      lcd.print("Lead-Free Set");
       ROOM = 50;
       SOAK_MIN = 150;
       SOAK_MAX = 200;
       REFLOW_MAX = 250;
-      COOL_MIN = 100;
+      COOL_MIN = 50;
       SAMPLING_TIME = 1000;
       SOAK_STEP = 5;
       SOAK_MICRO_PERIOD = 9000;
     }
-    delay(3000);
     windowStartTime = millis();
     setpoint = SOAK_MIN;
     ovenPID.SetOutputLimits(0, windowSize);
@@ -439,7 +425,7 @@ void Preheat()
     reflowStage = ERROR_PRESENT;
     return;
   }
-  if (input >= SOAK_MIN)
+  if (((SOAK_MIN + 5) > input) && (input >= SOAK_MIN))
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
     setpoint = SOAK_MIN + SOAK_STEP;
@@ -470,7 +456,7 @@ void Soak()
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
     setpoint += SOAK_STEP;
-    if (input > SOAK_MAX)
+    if (((SOAK_MAX + 5) > input) && (input > SOAK_MAX))
     {
       ovenPID.SetTunings(KP_REFLOW, KI_REFLOW, KD_REFLOW);
       setpoint = REFLOW_MAX;
@@ -494,7 +480,7 @@ void Reflow()
     reflowStage = ERROR_PRESENT;
     return;
   }
-  if (input >= (REFLOW_MAX))
+  if (((REFLOW_MAX + 5) > input) && (input >= (REFLOW_MAX)))
   {
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
