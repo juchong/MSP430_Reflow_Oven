@@ -93,9 +93,9 @@
 #define KI_SOAK 0.05
 #define KD_SOAK 250
 
-#define KP_REFLOW 300
-#define KI_REFLOW 0.05
-#define KD_REFLOW 350
+#define KP_REFLOW 350 // changed from 300
+#define KI_REFLOW 0.1 // changed from 0.05
+#define KD_REFLOW 400 // changed from 350
 
 /* REFLOW STAGE DEFINITIONS */
 typedef enum REFLOW_STAGE
@@ -495,7 +495,7 @@ void Reflow()
 void Cool()
 {
   DoControl();
-  if (input <= 60)
+  if ((input <= 60) && (input > 50))
   {
     reflowStage = COMPLETE_STAGE;
   }
