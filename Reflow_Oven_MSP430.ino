@@ -158,6 +158,7 @@ int SAMPLING_TIME;
 
 /* PIN ASSIGNMENT */
 int relayPin = 2;
+int ledPin = 13;
 int thermoSO = 15;
 int thermoCS = 8;
 int thermoCLK = 7;
@@ -204,6 +205,11 @@ void setup()
   // Setting control button modes
   pinMode(typeBttn, INPUT_PULLUP);
   pinMode(startstopBttn, INPUT_PULLUP);
+  
+  // Setting LED Pin mode
+  pinMode(ledPin, OUTPUT);
+  // pin is active LOW
+  digitalWrite(ledPin, HIGH);
   
   // Start-up Splash Screen
   lcd.begin(8, 2);
@@ -353,8 +359,6 @@ void Idle()
     reflowStage = ERROR_PRESENT;
     return;
   }
-  lcd.clear();
-  lcd.print("Select Solder");
   while (!ovenState)
   {
     // Setting up temporary variable for debouncing
@@ -407,6 +411,7 @@ void Idle()
     ovenPID.SetTunings(KP_PREHEAT, KI_PREHEAT, KD_PREHEAT);
     ovenPID.SetMode(AUTOMATIC);
     DoControl();
+    digitalWrite(ledPin,LOW);
     reflowStage = PREHEAT_STAGE;
   }
 }
@@ -495,6 +500,7 @@ void Reflow()
 void Cool()
 {
   DoControl();
+  digitalWrite(ledPin, HIGH);
   if ((input <= 60) && (input > 50))
   {
     reflowStage = COMPLETE_STAGE;
@@ -503,11 +509,11 @@ void Cool()
 
 //////////////////////////////////////////////
 // Complete
-//    This is really just a place-holder
-//    forced wait time to display the fact
-//    that the process is complete so the user
-//    knows they can take the soldered boards
-//    out of the oven.
+//    This is just a place-holder forced wait
+//    time to display the fact that the
+//    process is complete so the user knows
+//    they can take the soldered boards out
+//    of the oven.
 void Complete()
 {
   delay(5000);
@@ -546,9 +552,12 @@ void StartStop()
 {
   delayMicroseconds(40000);
   if(!digitalRead(startstopBttn))
-  {
+  {  
     ovenState = !ovenState;
     if(!ovenState)
+    {
       reflowStage = IDLE_STAGE;
+      digitalWrite(ledPin, HIGH);
+    }
   }
 }
