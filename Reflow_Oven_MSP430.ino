@@ -535,13 +535,10 @@ void Error()
 {
   detachInterrupt(startstopBttn);
   DoControl();
-  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
-    reflowStage = ERROR_PRESENT;
-  else
-  {
-    reflowStage = IDLE_STAGE;
-    attachInterrupt(startstopBttn, StartStop, FALLING);
-  }
+  lcd.clear();
+  lcd.println("Sensor Error!!!");
+  lcd.println("Reset Launchpad");
+  while(1);
 }
 
 //////////////////////////////////////////////
