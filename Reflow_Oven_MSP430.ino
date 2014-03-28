@@ -95,7 +95,7 @@
 #define KD_SOAK 250
 
 #define KP_REFLOW 350 // changed from 300
-#define KI_REFLOW 0.1 // changed from 0.05
+#define KI_REFLOW 0.12 // changed from 0.05
 #define KD_REFLOW 400 // changed from 350
 
 /* REFLOW STAGE DEFINITIONS */
