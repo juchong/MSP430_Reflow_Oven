@@ -69,6 +69,7 @@
 *  REVISION HISTORY
 *  =================
 *  1.0 - Initial release
+*  1.1 - Fix bug where oven does not go into ERROR state when communication is lost
 *
 ***************************************************************************************/
 
@@ -428,6 +429,7 @@ void Preheat()
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
+    ovenState = false;
     return;
   }
   if (((SOAK_MIN + 5) > input) && (input >= SOAK_MIN))
@@ -454,6 +456,7 @@ void Soak()
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
+    ovenState = false;
     return;
   }
 
@@ -483,6 +486,7 @@ void Reflow()
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
+    ovenState = false;
     return;
   }
   if (((REFLOW_MAX + 5) > input) && (input >= (REFLOW_MAX)))
