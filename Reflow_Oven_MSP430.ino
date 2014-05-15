@@ -1,41 +1,43 @@
 /***************************************************************************************
 *  Reflow Oven Controller
-*  Version: 1.0
-*  Date: 8-8-2013
+*  Version: 1.2
+*  Date: 05-15-2014
 *  Code Author: Kristen Villemez
 *  Hardware Design: Juan Chong
-*  Website: www.juanjchong.com
+*  Website: http://www.juanjchong.com/
+*  Last Updated By: Juan Chong
 *
 *  Overview
 *  =========
 *  This code is used to control a reflow oven. It allows for the option to change
-*  solder types (lead vs. lead-free) before each time the reflow process is started.
+*  solder types (lead vs. lead-free) before the reflow process is started.
 *  Definitions for both profiles are included in this code. This code is designed to
 *  work with the Reflow Oven Controller BoosterPack designed by Juan Chong. It uses
-*  the MAX31855 thermocouple chip and library and an on-board LCD screen for status
-*  display on the fly. A PID controller library is used to control the system.
+*  the MAX31855 thermocouple amplifier breakout board and library, and an on-board LCD 
+*  screen for status display. A PID controller library is used to control a solid state
+*  relay which drives the heater elements in a toaster oven.
 *
-*  Basic Usage
+*  Basic Use
 *  ============
-*  When the unit is first started, it will display the splash screen and prompt the
-*  user to select a solder type - lead or lead-free. The default is lead solder.
-*  If the user wishes to run the lead-free profile, press and hold the Solder Select
-*  button on the BoosterPack or Shield (depending on if you have a Launchpad or
-*  Arduino.
+*  When the controller is first started, it will display the splash screen and prompt the
+*  user to select a solder type - lead (Pb) or lead-free (NoPb). The default is lead solder.
+*  If the user wishes to run the lead-free profile, press the Solder Select
+*  button on the BoosterPack/Shield. Once you are ready to start the reflow process, press the
+*  Start Reflow button and wait for the system to run through the reflow profile.
 *
 *  Attributions
 *  =============
-* + Lim Phang Moh - http://www.rocketscream.com
-*  Author of MAX31855 library and original code off which this program is based
-* + Brett Beauregard - http://www.brettbeauregard.com
+* + Lim Phang Moh - http://www.rocketscream.com/
+*  Author of MAX31855 library and original Arduino code from which this program is based 
+* + Brett Beauregard - http://www.brettbeauregard.com/
 *  Author of Arduino PID Library used in this program
-* + Bill Earl - http://www.adafruit.com
+* + Bill Earl - http://www.adafruit.com/
 *  Author of Sous Vide, an excellent self-tuning PID controller example
 *
 *  DISCLAIMERS!!!
 *  ===============
-*  HIGH VOLTAGES ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS YOU ARE DEALING WITH
-*  WHEN DEALING WITH THIS HARDWARE BEFORE YOU BEGIN! USE COMMON SENSE WHEN WORKING
+*  HIGH VOLTAGES AND CURRENTS ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS OF WORKING 
+*  WITH DANGEROUS HARDWARE BEFORE YOU BEGIN! USE COMMON SENSE WHEN WORKING
 *  WITH THIS PROJECT. USE OF THIS HARDWARE AND SOFTWARE IS AT YOUR OWN RISK, AND
 *  WE ARE NOT RESPONSIBLE OR LIABLE FOR ANY DAMAGE TO YOU OR YOUR SURROUNDINGS THAT
 *  MAY OCCUR OUT OF USE OF THIS AND RELATED MATERIALS!
@@ -47,31 +49,33 @@
 *
 *  Licenses
 *  =========
-*  This hardware and software is released under...
+*  This hardware and software is released under:
 *  Creative Commons Share Alike v3.0 License
 *  http://creativecommons.org/licenses/by-sa/3.0/
 *  You are free to use this code and/or modify it. All we ask is an attribution,
 *  including supporting libraries and their respective authors used in this
-*  software.
+*  software. If you would like to use this software and hardware for commercial
+*  purposes, please contact the author using the website listed above.
 *
 *  Required Libraries
 *  ===================
-* - Arduino PID Library: (cross-platform compatible)
+* - Arduino PID Library: (Energia or Arduino Compatible)
 *    >> https://github.com/b3rttb/Arduino-PID-Library
-* - MAX31855 Library (cross-platform compatible)
+* - MAX31855 Library (Energia or Arduino Compatible)
 *    >> https://github.com/rocketscream/MAX31855
-* - TwoMsTimer Library (use this if you are using the MSP430 Launchpad and Boosterpack)
+* - TwoMsTimer Library (Energia Compatible - Only Use If Programming An MSP430)
 *    >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
-* - Timer1 Library (use this if you are using the Arduino and Shield)
+* - Timer1 Library (Arduino Compatible - Only Use If Programming An Arduino)
 *    >> http://playground.arduino.cc/code/timer1
-* - LiquidCrystal Library (included in both development environments)
+* - LiquidCrystal Library (Included By Default In Both Development Environments)
 *
 *  REVISION HISTORY
 *  =================
 *  1.0 - Initial release
-*  1.1 - Fix bug where oven does not go into ERROR state when communication is lost
+*  1.1 - Fix bug where oven does not go into ERROR state when thermocouple communication is lost
+*  1.2 - Optimized ISR tasks and LCD updating to avoid timing and memory issues.
 *
-***************************************************************************************/
+***************************************************************************************
 
 //////////////////////////////////////////////
 //   BEGIN INSTANTIATIONS AND DEFINITIONS   //
@@ -126,7 +130,7 @@ unsigned long timerSoak;
 
 /* LCD MESSAGES */
 const char* lcdStageMessages[] = {
-  "Select Solder",
+  "Solder Type",
   "PRE-HEAT",
   "SOAK",
   "REFLOW",
@@ -158,6 +162,7 @@ int COOL_MIN;
 int SAMPLING_TIME;
 
 /* PIN ASSIGNMENT */
+/* Do not change if using the Launchpad BoosterPack!! */
 int relayPin = 2;
 int ledPin = 13;
 int thermoSO = 15;
@@ -193,7 +198,7 @@ boolean solderType = true;
 
 //////////////////////////////////////////////
 // setup Function:
-//    Sets pin modes and plays splash screen
+// Sets pin modes and plays splash screen
 void setup()
 {
   // Ensure oven relay is off
@@ -201,7 +206,7 @@ void setup()
   pinMode(relayPin, OUTPUT);
   
   // Start Serial monitor, for debugging
-  Serial.begin(9600);
+  //Serial.begin(9600);
   
   // Setting control button modes
   pinMode(typeBttn, INPUT_PULLUP);
@@ -216,16 +221,16 @@ void setup()
   lcd.begin(8, 2);
   lcd.createChar(1, degree);
   lcd.clear();
-  lcd.print("Reflow Oven 1.0");
+  lcd.print("Reflow Oven 1.2");
   lcd.setCursor(0,1);
-  lcd.print("MSP430-TI In It");
-  delay(2500);
+  lcd.print("MSP430 - juchong");
+  delay(2000);
   lcd.clear();
   
   // Begin Time Keeping
   //   Replace these with the relevant commands from Timer1 for Arduino
   //   to interrupt every 500 ms
-  TwoMsTimer::set(500, InterruptHandler);
+  TwoMsTimer::set(300, InterruptHandler);
   TwoMsTimer::start();
   
   // Attach START/STOP interrupt to the button
@@ -274,32 +279,49 @@ void loop()
       Error();
       break;
   }
-  
 }
+
+// This function will clear the LCD. It will be called when changing reflow stages.
+void CleanLCD()
+{
+  lcd.clear();
+}
+
+// This function will print reflow stages, temperatures, and reflow modes
+// periodically when the timer interrupt is triggered. This function does not 
+// clear the LCD, but instead overwrites data present on the display previously.
+void UpdateLCD()
+{   
+  lcd.setCursor(0,0);
+  lcd.print(lcdStageMessages[reflowStage]);
+  if (reflowStage == IDLE_STAGE)
+  {
+    if(solderType)
+    {
+      lcd.print(" Pb  ");
+    }
+    else
+    {
+      lcd.print(" NoPb");
+    }
+  }
+  lcd.setCursor(0,1);
+  lcd.print(input);
+  lcd.write(1);
+  lcd.print("C         ");
+}
+
 
 //////////////////////////////////////////////
 // Interrupt Handler
 //    This simple function decides whether to
 //    make the next computation (if oven state
 //    is true) or to ensure oven is switched
-//    off. It is called every 15ms as called
+//    off. It is called every 100ms as called
 //    by the watchdog timer in TwoMsTimer.
 void InterruptHandler()
 {
-  lcd.clear();
-  lcd.print(lcdStageMessages[reflowStage]);
-  lcd.setCursor(0,1);
-  lcd.print(input);
-  lcd.write(1);
-  lcd.print("C ");
-  if(solderType)
-  {
-    lcd.print("Lead");
-  }
-  else
-  {
-    lcd.print("No Lead");
-  }
+  UpdateLCD();
   if (ovenState)
   {
     DriveOutput();
@@ -320,7 +342,7 @@ void InterruptHandler()
 //    current temperature and reflow stage.
 void DriveOutput()
 {
-  Serial.println(output);
+  //Serial.println(output);
   long now = millis();
   if(now - windowStartTime > windowSize)
   { //time to shift the Relay Window
@@ -374,7 +396,6 @@ void Idle()
       //  should be pressed and not just bouncing
       if (pressConfLvl > 32000)
       {
-        lcd.clear();
         solderType = !solderType;
         // Reset the counter for the next button press
         pressConfLvl = 0;
@@ -414,6 +435,7 @@ void Idle()
     DoControl();
     digitalWrite(ledPin,LOW);
     reflowStage = PREHEAT_STAGE;
+    CleanLCD();
   }
 }
 
@@ -426,7 +448,7 @@ void Idle()
 void Preheat()
 {
   DoControl();
-  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
+  if ((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
     ovenState = false;
@@ -438,6 +460,7 @@ void Preheat()
     setpoint = SOAK_MIN + SOAK_STEP;
     ovenPID.SetTunings(KP_SOAK, KI_SOAK, KD_SOAK);
     reflowStage = SOAK_STAGE;
+    CleanLCD();
   }
 }
 
@@ -453,7 +476,7 @@ void Preheat()
 void Soak()
 {
   DoControl();
-  if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
+  if ((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
     ovenState = false;
@@ -469,6 +492,7 @@ void Soak()
       ovenPID.SetTunings(KP_REFLOW, KI_REFLOW, KD_REFLOW);
       setpoint = REFLOW_MAX;
       reflowStage = REFLOW_STAGE;
+      CleanLCD();
     }
   }
 }
@@ -493,6 +517,7 @@ void Reflow()
   {
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
+    CleanLCD();
   }
 }
 
@@ -508,6 +533,7 @@ void Cool()
   if ((input <= 60) && (input > 50))
   {
     reflowStage = COMPLETE_STAGE;
+    CleanLCD();
   }
 }
 
@@ -522,6 +548,7 @@ void Complete()
 {
   delay(5000);
   reflowStage = IDLE_STAGE;
+  CleanLCD();
   ovenState = false;
 }
 
