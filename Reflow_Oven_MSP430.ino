@@ -1,6 +1,7 @@
 /***************************************************************************************
-*  Reflow Oven Controller
-*  Version: 1.2
+*  Reflow Oven Controller for the TI MSP430 Launchpad
+*  Built for the TI MSP430G2553 Microcontroller
+*  Software Version: 1.2
 *  Date: 05-15-2014
 *  Code Author: Kristen Villemez
 *  Hardware Design: Juan Chong
@@ -17,23 +18,6 @@
 *  screen for status display. A PID controller library is used to control a solid state
 *  relay which drives the heater elements in a toaster oven.
 *
-*  Basic Use
-*  ============
-*  When the controller is first started, it will display the splash screen and prompt the
-*  user to select a solder type - lead (Pb) or lead-free (NoPb). The default is lead solder.
-*  If the user wishes to run the lead-free profile, press the Solder Select
-*  button on the BoosterPack/Shield. Once you are ready to start the reflow process, press the
-*  Start Reflow button and wait for the system to run through the reflow profile.
-*
-*  Attributions
-*  =============
-* + Lim Phang Moh - http://www.rocketscream.com/
-*  Author of MAX31855 library and original Arduino code from which this program is based 
-* + Brett Beauregard - http://www.brettbeauregard.com/
-*  Author of Arduino PID Library used in this program
-* + Bill Earl - http://www.adafruit.com/
-*  Author of Sous Vide, an excellent self-tuning PID controller example
-*
 *  DISCLAIMERS!!!
 *  ===============
 *  HIGH VOLTAGES AND CURRENTS ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS OF WORKING 
@@ -47,6 +31,35 @@
 *  CONDITION, UNINTERRUPTED USE, MERCHANTABILITY, FITNESS FOR A PARTICULAR USE, OR
 *  NON-INFRINGEMENT.
 *
+*  Basic Use
+*  ============
+*  When the controller is first started, it will display the splash screen and prompt the
+*  user to select a solder type - lead (Pb) or lead-free (NoPb). The default is lead solder.
+*  If the user wishes to run the lead-free profile, press the Solder Select
+*  button on the BoosterPack/Shield. Once you are ready to start the reflow process, press the
+*  Start Reflow button and wait for the system to run through the reflow profile.
+*
+*  Required Libraries
+*  ===================
+* - Arduino PID Library: (Energia or Arduino Compatible)
+*    >> http://playground.arduino.cc/Code/PIDLibrary
+* - MAX31855 Library (Energia or Arduino Compatible)
+*    >> https://github.com/rocketscream/MAX31855
+* - TwoMsTimer Library (Energia Compatible - Only Use If Programming An MSP430)
+*    >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
+* - Timer1 Library (Arduino Compatible - Only Use If Programming An Arduino)
+*    >> http://playground.arduino.cc/code/timer1
+* - LiquidCrystal Library (Included By Default In Both Development Environments)
+*
+*  Attributions
+*  =============
+* + Lim Phang Moh - http://www.rocketscream.com/
+*  Author of MAX31855 library and original Arduino code from which this program is based 
+* + Brett Beauregard - http://www.brettbeauregard.com/
+*  Author of Arduino PID Library used in this program
+* + Bill Earl - http://www.adafruit.com/
+*  Author of Sous Vide, an excellent self-tuning PID controller example
+*
 *  Licenses
 *  =========
 *  This hardware and software is released under:
@@ -56,18 +69,6 @@
 *  including supporting libraries and their respective authors used in this
 *  software. If you would like to use this software and hardware for commercial
 *  purposes, please contact the author using the website listed above.
-*
-*  Required Libraries
-*  ===================
-* - Arduino PID Library: (Energia or Arduino Compatible)
-*    >> https://github.com/b3rttb/Arduino-PID-Library
-* - MAX31855 Library (Energia or Arduino Compatible)
-*    >> https://github.com/rocketscream/MAX31855
-* - TwoMsTimer Library (Energia Compatible - Only Use If Programming An MSP430)
-*    >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
-* - Timer1 Library (Arduino Compatible - Only Use If Programming An Arduino)
-*    >> http://playground.arduino.cc/code/timer1
-* - LiquidCrystal Library (Included By Default In Both Development Environments)
 *
 *  REVISION HISTORY
 *  =================
