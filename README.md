@@ -4,7 +4,7 @@ Reflow Oven Controller for the TI MSP430 Launchpad
 + Software Version: 1.2
 + Last Update: 05-15-2014
 + Initial Code Author: Kristen Villemez
-+ Hardware Design: [Juan Chong]http://www.juanjchong.com/
++ Hardware Design: [Juan Chong](http://www.juanjchong.com/)
 + Website: http://www.juanjchong.com/2013/msp430-reflow-oven-controller/
 + Last Updated By: Juan Chong
 
