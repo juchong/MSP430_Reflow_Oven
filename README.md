@@ -1,5 +1,6 @@
-Reflow Oven Controller For MSP430G2553 Launchpad
+Reflow Oven Controller For MSP430 Launchpad
 ========
++ Built for the MSP430G2553 Microcontroller
 + Version: 1.2
 + Last Update: 05-15-2014
 + Initial Code Author: Kristen Villemez
@@ -26,7 +27,7 @@ button on the BoosterPack/Shield. Once you are ready to start the reflow process
 Start Reflow button and wait for the system to run through the reflow profile.
 
 Attributions
-========
+============
 + Lim Phang Moh - http://www.rocketscream.com/
   + Author of MAX31855 library and original Arduino code from which this program is based 
 + Brett Beauregard - http://www.brettbeauregard.com/
@@ -35,7 +36,7 @@ Attributions
   + Author of Sous Vide, an excellent self-tuning PID controller example
 
 DISCLAIMER!!!
-========
+=============
 HIGH VOLTAGES AND CURRENTS ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS OF WORKING 
 WITH DANGEROUS HARDWARE BEFORE YOU BEGIN! USE COMMON SENSE WHEN WORKING
 WITH THIS PROJECT. USE OF THIS HARDWARE AND SOFTWARE IS AT YOUR OWN RISK, AND
@@ -50,8 +51,8 @@ NON-INFRINGEMENT.
 Licenses
 =========
 This hardware and software is released under:
-Creative Commons Share Alike v3.0 License
 
+Creative Commons Share Alike v3.0 License  
 http://creativecommons.org/licenses/by-sa/3.0/
   
 You are free to use this code and/or modify it. All we ask is an attribution, 
@@ -59,8 +60,8 @@ including supporting libraries and their respective authors used in this
 software. If you would like to use this software and hardware for commercial
 purposes, please contact the author using the website listed above.
 
-Required Libraries
-===================
+Libraries
+==========
 - Arduino PID Library: (Energia or Arduino Compatible)
   - https://github.com/b3rttb/Arduino-PID-Library
 - MAX31855 Library (Energia or Arduino Compatible)
@@ -72,7 +73,7 @@ Required Libraries
 - LiquidCrystal Library (Included By Default In Both Development Environments)
 
 Revision History
-========
+================
 1.0 - Initial release
 
 1.1 - Fix bug where oven does not go into ERROR state when thermocouple communication is lost
