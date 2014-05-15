@@ -1,7 +1,7 @@
-Reflow Oven Controller for the MSP430 Launchpad
+Reflow Oven Controller for the TI MSP430 Launchpad
 ========
-+ Built for the MSP430G2553 Microcontroller
-+ Version: 1.2
++ Built for the TI MSP430G2553 Microcontroller
++ Software Version: 1.2
 + Last Update: 05-15-2014
 + Initial Code Author: Kristen Villemez
 + Hardware Design: Juan Chong
@@ -42,7 +42,7 @@ Start Reflow button and wait for the system to run through the reflow profile.
 Libraries
 ==========
 - Arduino PID Library: (Energia or Arduino Compatible)
-  - https://github.com/b3rttb/Arduino-PID-Library
+  - http://playground.arduino.cc/Code/PIDLibrary
 - MAX31855 Library (Energia or Arduino Compatible)
   - https://github.com/rocketscream/MAX31855
 - TwoMsTimer Library (Energia Compatible - Only Use If Programming An MSP430)
@@ -65,7 +65,8 @@ Licenses
 This hardware and software is released under:
 
 Creative Commons Share Alike v3.0 License  
-http://creativecommons.org/licenses/by-sa/3.0/
+http://creativecommons.org/licenses/by-sa/3.0/  
+A copy of this license can be found in the LICENSE file within this project.
   
 You are free to use this code and/or modify it. All we ask is an attribution, 
 including supporting libraries and their respective authors used in this
