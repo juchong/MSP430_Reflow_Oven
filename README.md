@@ -51,7 +51,8 @@ Licenses
 =========
 This hardware and software is released under:
 Creative Commons Share Alike v3.0 License
-  >>http://creativecommons.org/licenses/by-sa/3.0/
+
+http://creativecommons.org/licenses/by-sa/3.0/
   
 You are free to use this code and/or modify it. All we ask is an attribution, 
 including supporting libraries and their respective authors used in this
@@ -61,13 +62,13 @@ purposes, please contact the author using the website listed above.
 Required Libraries
 ===================
 - Arduino PID Library: (Energia or Arduino Compatible)
-  >> https://github.com/b3rttb/Arduino-PID-Library
+  - https://github.com/b3rttb/Arduino-PID-Library
 - MAX31855 Library (Energia or Arduino Compatible)
-  >> https://github.com/rocketscream/MAX31855
+  - https://github.com/rocketscream/MAX31855
 - TwoMsTimer Library (Energia Compatible - Only Use If Programming An MSP430)
-  >> https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
+  - https://github.com/freemansoft/build-monitor-devices/tree/master/ti_launchpad_rgb
 - Timer1 Library (Arduino Compatible - Only Use If Programming An Arduino)
-  >> http://playground.arduino.cc/code/timer1
+  - http://playground.arduino.cc/code/timer1
 - LiquidCrystal Library (Included By Default In Both Development Environments)
 
 Revision History
