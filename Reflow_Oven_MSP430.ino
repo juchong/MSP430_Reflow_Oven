@@ -256,7 +256,7 @@ void loop()
     ovenState = false;
     reflowStage = IDLE_STAGE;
   }
-  DoControl();
+  //DoControl();
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -325,18 +325,11 @@ void UpdateLCD()
 //    off. It is called every 100ms as called
 //    by the watchdog timer in TwoMsTimer.
 
+/* If anything else needs to go in the ISR place it here.
+ * Else just call UpdateLCD from Loop */
 void Update()
 {
   UpdateLCD();
-  if (ovenState)
-  {
-    DriveOutput();
-  }
-  else
-  {
-    digitalWrite(relayPin, LOW);
-  }
-
   doUpdate = false;
 }
 
@@ -380,6 +373,7 @@ void DoControl()
 {
   input = thermo.readThermocouple(CELSIUS);
   ovenPID.Compute();
+  DriveOutput();
 }
 
 //////////////////////////////////////////////
@@ -563,6 +557,7 @@ void Complete()
   reflowStage = IDLE_STAGE;
   CleanLCD();
   ovenState = false;
+  digitalWrite(relayPin, LOW);
 }
 
 //////////////////////////////////////////////
@@ -578,6 +573,7 @@ void Error()
   lcd.clear();
   lcd.println("Sensor Error!!!");
   lcd.println("Reset Launchpad");
+  digitalWrite(relayPin, LOW);
   while(1);
 }
 
