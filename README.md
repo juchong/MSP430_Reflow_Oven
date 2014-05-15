@@ -18,7 +18,7 @@ the MAX31855 thermocouple amplifier breakout board and library, and an on-board 
 screen for status display. A PID controller library is used to control a solid state
 relay which drives the heater elements in a toaster oven.
 
-DISCLAIMER!!!
+DISCLAIMER!
 =============
 HIGH VOLTAGES AND CURRENTS ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS OF WORKING 
 WITH DANGEROUS HARDWARE BEFORE YOU BEGIN! USE COMMON SENSE WHEN WORKING
