@@ -181,6 +181,7 @@ int startstopBttn = 6;
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 boolean ovenState = false;
+boolean doUpdate = false;
 
 /* INSTANTIATE PID CONTROLLER */
 PID ovenPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
@@ -280,6 +281,9 @@ void loop()
       Error();
       break;
   }
+
+  if (doUpdate)
+    Update();
 }
 
 // This function will clear the LCD. It will be called when changing reflow stages.
@@ -320,7 +324,8 @@ void UpdateLCD()
 //    is true) or to ensure oven is switched
 //    off. It is called every 100ms as called
 //    by the watchdog timer in TwoMsTimer.
-void InterruptHandler()
+
+void Update()
 {
   UpdateLCD();
   if (ovenState)
@@ -331,6 +336,13 @@ void InterruptHandler()
   {
     digitalWrite(relayPin, LOW);
   }
+
+  doUpdate = false;
+}
+
+void InterruptHandler()
+{
+  doUpdate = true;
 }
 
 //////////////////////////////////////////////
