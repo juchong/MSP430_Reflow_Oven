@@ -18,23 +18,6 @@ the MAX31855 thermocouple amplifier breakout board and library, and an on-board 
 screen for status display. A PID controller library is used to control a solid state
 relay which drives the heater elements in a toaster oven.
 
-Basic Use
-=========
-When the controller is first started, it will display the splash screen and prompt the
-user to select a solder type - lead (Pb) or lead-free (NoPb). The default is lead solder.
-If the user wishes to run the lead-free profile, press the Solder Select
-button on the BoosterPack/Shield. Once you are ready to start the reflow process, press the
-Start Reflow button and wait for the system to run through the reflow profile.
-
-Attributions
-============
-+ Lim Phang Moh - http://www.rocketscream.com/
-  + Author of MAX31855 library and original Arduino code from which this program is based 
-+ Brett Beauregard - http://www.brettbeauregard.com/
-  + Author of Arduino PID Library used in this program
-+ Bill Earl - http://www.adafruit.com/
-  + Author of Sous Vide, an excellent self-tuning PID controller example
-
 DISCLAIMER!!!
 =============
 HIGH VOLTAGES AND CURRENTS ARE DANGEROUS! PLEASE UNDERSTAND THE RISKS OF WORKING 
@@ -48,17 +31,13 @@ EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF
 CONDITION, UNINTERRUPTED USE, MERCHANTABILITY, FITNESS FOR A PARTICULAR USE, OR
 NON-INFRINGEMENT.
 
-Licenses
+Basic Use
 =========
-This hardware and software is released under:
-
-Creative Commons Share Alike v3.0 License  
-http://creativecommons.org/licenses/by-sa/3.0/
-  
-You are free to use this code and/or modify it. All we ask is an attribution, 
-including supporting libraries and their respective authors used in this
-software. If you would like to use this software and hardware for commercial
-purposes, please contact the author using the website listed above.
+When the controller is first started, it will display the splash screen and prompt the
+user to select a solder type - lead (Pb) or lead-free (NoPb). The default is lead solder.
+If the user wishes to run the lead-free profile, press the Solder Select
+button on the BoosterPack/Shield. Once you are ready to start the reflow process, press the
+Start Reflow button and wait for the system to run through the reflow profile.
 
 Libraries
 ==========
@@ -71,6 +50,27 @@ Libraries
 - Timer1 Library (Arduino Compatible - Only Use If Programming An Arduino)
   - http://playground.arduino.cc/code/timer1
 - LiquidCrystal Library (Included By Default In Both Development Environments)
+
+Attributions
+============
++ Lim Phang Moh - http://www.rocketscream.com/
+  + Author of MAX31855 library and original Arduino code from which this program is based 
++ Brett Beauregard - http://www.brettbeauregard.com/
+  + Author of Arduino PID Library used in this program
++ Bill Earl - http://www.adafruit.com/
+  + Author of Sous Vide, an excellent self-tuning PID controller example
+
+Licenses
+=========
+This hardware and software is released under:
+
+Creative Commons Share Alike v3.0 License  
+http://creativecommons.org/licenses/by-sa/3.0/
+  
+You are free to use this code and/or modify it. All we ask is an attribution, 
+including supporting libraries and their respective authors used in this
+software. If you would like to use this software and hardware for commercial
+purposes, please contact the author using the website listed above.
 
 Revision History
 ================
