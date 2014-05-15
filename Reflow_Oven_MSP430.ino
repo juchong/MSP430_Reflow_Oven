@@ -408,6 +408,9 @@ void Idle()
         pressConfLvl = 0;
       }
     }
+
+    if (doUpdate)
+      Update();
   }
   if(ovenState)
   {
@@ -595,6 +598,7 @@ void StartStop()
     {
       reflowStage = IDLE_STAGE;
       digitalWrite(ledPin, HIGH);
+      digitalWrite(relayPin,LOW);
     }
   }
 }
