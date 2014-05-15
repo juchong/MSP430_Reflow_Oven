@@ -28,11 +28,11 @@ Start Reflow button and wait for the system to run through the reflow profile.
 Attributions
 ========
 + Lim Phang Moh - http://www.rocketscream.com/
-..+ Author of MAX31855 library and original Arduino code from which this program is based 
+  + Author of MAX31855 library and original Arduino code from which this program is based 
 + Brett Beauregard - http://www.brettbeauregard.com/
-..+ Author of Arduino PID Library used in this program
+  + Author of Arduino PID Library used in this program
 + Bill Earl - http://www.adafruit.com/
-..+ Author of Sous Vide, an excellent self-tuning PID controller example
+  + Author of Sous Vide, an excellent self-tuning PID controller example
 
 DISCLAIMER!!!
 ========
