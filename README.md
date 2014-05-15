@@ -1,11 +1,11 @@
 Reflow Oven Controller For MSP430G2553 Launchpad
 ========
-+Version: 1.2
-+Last Update: 05-15-2014
-+Initial Code Author: Kristen Villemez
-+Hardware Design: Juan Chong
-+Website: http://www.juanjchong.com/
-+Last Updated By: Juan Chong
++ Version: 1.2
++ Last Update: 05-15-2014
++ Initial Code Author: Kristen Villemez
++ Hardware Design: Juan Chong
++ Website: http://www.juanjchong.com/
++ Last Updated By: Juan Chong
 
 Overview
 ========
@@ -73,5 +73,7 @@ Required Libraries
 Revision History
 ========
 1.0 - Initial release
+
 1.1 - Fix bug where oven does not go into ERROR state when thermocouple communication is lost
+
 1.2 - Optimized ISR tasks and LCD updating to avoid timing and memory issues.
