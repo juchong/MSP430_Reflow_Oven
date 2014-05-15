@@ -1,11 +1,11 @@
 Reflow Oven Controller For MSP430G2553 Launchpad
 ========
-Version: 1.2
-Last Update: 05-15-2014
-Initial Code Author: Kristen Villemez
-Hardware Design: Juan Chong
-Website: http://www.juanjchong.com/
-Last Updated By: Juan Chong
++Version: 1.2
++Last Update: 05-15-2014
++Initial Code Author: Kristen Villemez
++Hardware Design: Juan Chong
++Website: http://www.juanjchong.com/
++Last Updated By: Juan Chong
 
 Overview
 ========
@@ -52,6 +52,7 @@ Licenses
 This hardware and software is released under:
 Creative Commons Share Alike v3.0 License
   >>http://creativecommons.org/licenses/by-sa/3.0/
+  
 You are free to use this code and/or modify it. All we ask is an attribution, 
 including supporting libraries and their respective authors used in this
 software. If you would like to use this software and hardware for commercial
