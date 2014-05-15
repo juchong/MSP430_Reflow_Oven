@@ -1,4 +1,4 @@
-Reflow Oven Controller For MSP430 Launchpad
+Reflow Oven Controller for the MSP430 Launchpad
 ========
 + Built for the MSP430G2553 Microcontroller
 + Version: 1.2
