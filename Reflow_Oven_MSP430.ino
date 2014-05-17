@@ -181,6 +181,7 @@ int startstopBttn = 6;
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 boolean ovenState = false;
+boolean doUpdate = false;
 
 /* INSTANTIATE PID CONTROLLER */
 PID ovenPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
@@ -255,7 +256,7 @@ void loop()
     ovenState = false;
     reflowStage = IDLE_STAGE;
   }
-  DoControl();
+  //DoControl();
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -280,6 +281,9 @@ void loop()
       Error();
       break;
   }
+
+  if (doUpdate)
+    Update();
 }
 
 // This function will clear the LCD. It will be called when changing reflow stages.
@@ -320,17 +324,18 @@ void UpdateLCD()
 //    is true) or to ensure oven is switched
 //    off. It is called every 100ms as called
 //    by the watchdog timer in TwoMsTimer.
-void InterruptHandler()
+
+/* If anything else needs to go in the ISR place it here.
+ * Else just call UpdateLCD from Loop */
+void Update()
 {
   UpdateLCD();
-  if (ovenState)
-  {
-    DriveOutput();
-  }
-  else
-  {
-    digitalWrite(relayPin, LOW);
-  }
+  doUpdate = false;
+}
+
+void InterruptHandler()
+{
+  doUpdate = true;
 }
 
 //////////////////////////////////////////////
@@ -368,6 +373,7 @@ void DoControl()
 {
   input = thermo.readThermocouple(CELSIUS);
   ovenPID.Compute();
+  DriveOutput();
 }
 
 //////////////////////////////////////////////
@@ -402,6 +408,9 @@ void Idle()
         pressConfLvl = 0;
       }
     }
+
+    if (doUpdate)
+      Update();
   }
   if(ovenState)
   {
@@ -551,6 +560,7 @@ void Complete()
   reflowStage = IDLE_STAGE;
   CleanLCD();
   ovenState = false;
+  digitalWrite(relayPin, LOW);
 }
 
 //////////////////////////////////////////////
@@ -566,6 +576,7 @@ void Error()
   lcd.clear();
   lcd.println("Sensor Error!!!");
   lcd.println("Reset Launchpad");
+  digitalWrite(relayPin, LOW);
   while(1);
 }
 
@@ -587,6 +598,7 @@ void StartStop()
     {
       reflowStage = IDLE_STAGE;
       digitalWrite(ledPin, HIGH);
+      digitalWrite(relayPin,LOW);
     }
   }
 }
