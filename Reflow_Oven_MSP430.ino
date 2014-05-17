@@ -2,7 +2,7 @@
 *  Reflow Oven Controller for the TI MSP430 Launchpad
 *  Built for the TI MSP430G2553 Microcontroller
 *  Software Version: 1.2
-*  Date: 05-15-2014
+*  Date: 05-16-2014
 *  Code Author: Kristen Villemez
 *  Hardware Design: Juan Chong
 *  Website: http://www.juanjchong.com/
@@ -132,12 +132,12 @@ unsigned long timerSoak;
 /* LCD MESSAGES */
 const char* lcdStageMessages[] = {
   "Solder Type",
-  "PRE-HEAT",
-  "SOAK",
-  "REFLOW",
-  "COOLING",
-  "COMPLETE",
-  "SENSOR ERROR"
+  "PRE-HEATING...",
+  "SOAKING...",
+  "REFLOWING...",
+  "COOLING...",
+  "COMPLETE!",
+  "SENSOR ERROR!"
 };
 
 /* DEGREE SYMBOL DEF */
@@ -556,7 +556,7 @@ void Cool()
 //    of the oven.
 void Complete()
 {
-  delay(5000);
+  delay(3000);
   reflowStage = IDLE_STAGE;
   CleanLCD();
   ovenState = false;
