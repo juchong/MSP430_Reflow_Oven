@@ -107,6 +107,7 @@
 typedef enum REFLOW_STAGE
 {
   IDLE_STAGE,
+  PROBE_CHECK,
   PREHEAT_STAGE,
   SOAK_STAGE,
   REFLOW_STAGE,
@@ -132,6 +133,7 @@ unsigned long timerSoak;
 /* LCD MESSAGES */
 const char* lcdStageMessages[] = {
   "Solder Type",
+  "Probe On PCB?"
   "PRE-HEATING...",
   "SOAKING...",
   "REFLOWING...",
@@ -182,6 +184,8 @@ int startstopBttn = 6;
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 boolean ovenState = false;
 boolean doUpdate = false;
+boolean probeState = false;
+boolean probeOnBoard = false;
 
 /* INSTANTIATE PID CONTROLLER */
 PID ovenPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
@@ -262,6 +266,9 @@ void loop()
     case IDLE_STAGE:
       Idle();
       break;
+    case PROBE_CHECK:
+      Probe();
+      break;
     case PREHEAT_STAGE:
       Preheat();
       break;
@@ -308,6 +315,19 @@ void UpdateLCD()
     else
     {
       lcd.print(" NoPb");
+    }
+  }
+  if (reflowStage == PROBE_CHECK)
+  {
+    if (probeOnBoard)
+    {
+      lcd.cursor(0,1);
+      lcd.print("Yes?");
+    else
+      {
+        lcd.cursor(0,1);
+        lcd.print("No? ");
+      }
     }
   }
   lcd.setCursor(0,1);
@@ -410,7 +430,9 @@ void Idle()
     }
 
     if (doUpdate)
+    {
       Update();
+    }
   }
   if(ovenState)
   {
@@ -444,8 +466,45 @@ void Idle()
     ovenPID.SetMode(AUTOMATIC);
     DoControl();
     digitalWrite(ledPin,LOW);
-    reflowStage = PREHEAT_STAGE;
+    reflowStage = PROBE_CHECK;
     CleanLCD();
+    detatchInterrupt(startstopBttn);
+    attachInterrupt(startstopBttn, ProbeSet, FALLING);
+  }
+}
+
+
+void Probe()
+{
+  // Setting up temporary variable for debouncing
+  int pressConfLvl = 0;
+
+  while (!digitalRead(typeBttn))
+  {
+    // Increment button confidence counter
+    pressConfLvl++;
+    //  If by now the counter has reached 32000, button
+    //  should be pressed and not just bouncing
+    if (pressConfLvl > 32000)
+    {
+      probeOnBoard = !probeOnBoard;
+      // Reset the counter for the next button press
+      pressConfLvl = 0;
+    }
+  }
+
+  if (doUpdate)
+  {
+    Update();
+  }
+
+  if(probeState && probeOnBoard)
+  {
+    reflowStage = PREHEAT_STAGE
+    CleanLCD();
+    detatchInterrupt(startstopBttn);
+    attachInterrupt(startstopBttn, StartStop, FALLING);
+    probeState = false;
   }
 }
 
@@ -600,5 +659,20 @@ void StartStop()
       digitalWrite(ledPin, HIGH);
       digitalWrite(relayPin,LOW);
     }
+  }
+}
+
+//////////////////////////////////////////////
+// ProbeSet
+//    This function handles the software
+//    debouncing of the Start/Stop button, as
+//    well as handling the setting of the
+//    probeState variable.
+void ProbeSet()
+{
+  delayMicroseconds(40000);
+  if(!digitalRead(startstopBttn))
+  {  
+    probeState = !probeState;
   }
 }
