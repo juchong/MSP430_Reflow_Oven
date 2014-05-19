@@ -1,7 +1,7 @@
 /***************************************************************************************
 *  Reflow Oven Controller for the TI MSP430 Launchpad
 *  Built for the TI MSP430G2553 Microcontroller
-*  Software Version: 1.2
+*  Software Version: 1.3
 *  Date: 05-16-2014
 *  Code Author: Kristen Villemez
 *  Hardware Design: Juan Chong
@@ -134,7 +134,7 @@ unsigned long timerSoak;
 /* LCD MESSAGES */
 const char* lcdStageMessages[] = {
   "Solder Type",
-  "Probe On PCB?"
+  "Probe On PCB?   ",
   "PRE-HEATING...",
   "SOAKING...",
   "REFLOWING...",
@@ -187,6 +187,7 @@ boolean ovenState = false;
 boolean doUpdate = false;
 boolean probeState = false;
 boolean probeOnBoard = false;
+boolean asked = false;
 
 /* INSTANTIATE PID CONTROLLER */
 PID ovenPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
@@ -322,19 +323,22 @@ void UpdateLCD()
   {
     if (probeOnBoard)
     {
-      lcd.cursor(0,1);
+      lcd.setCursor(0,1);
       lcd.print("Yes?");
     }
     else
     {
-      lcd.cursor(0,1);
+      lcd.setCursor(0,1);
       lcd.print("No? ");
     }
   }
-  lcd.setCursor(0,1);
-  lcd.print(input);
-  lcd.write(1);
-  lcd.print("C         ");
+  if (reflowStage != PROBE_CHECK)
+  {
+    lcd.setCursor(0,1);
+    lcd.print(input);
+    lcd.write(1);
+    lcd.print("C         ");
+  }
 }
 
 
@@ -370,18 +374,25 @@ void InterruptHandler()
 void DriveOutput()
 {
   //Serial.println(output);
-  long now = millis();
-  if(now - windowStartTime > windowSize)
-  { //time to shift the Relay Window
-    windowStartTime += windowSize;
-  }
-  if(output > (now - windowStartTime))
+  if (reflowStage == PROBE_CHECK)
   {
-    digitalWrite(relayPin,HIGH);
+    digitalWrite(relayPin,LOW);
   }
   else
   {
-    digitalWrite(relayPin,LOW);
+    long now = millis();
+    if(now - windowStartTime > windowSize)
+    { //time to shift the Relay Window
+      windowStartTime += windowSize;
+    }
+    if(output > (now - windowStartTime))
+    {
+      digitalWrite(relayPin,HIGH);
+    }
+    else
+    {
+      digitalWrite(relayPin,LOW);
+    }
   }
 }
 
@@ -392,9 +403,12 @@ void DriveOutput()
 //    oven properly.
 void DoControl()
 {
-  input = thermo.readThermocouple(CELSIUS);
-  ovenPID.Compute();
-  DriveOutput();
+  if (reflowStage != PROBE_CHECK)
+  {
+    input = thermo.readThermocouple(CELSIUS);
+    ovenPID.Compute();
+    DriveOutput();
+  }
 }
 
 //////////////////////////////////////////////
@@ -422,7 +436,7 @@ void Idle()
       pressConfLvl++;
       //  If by now the counter has reached 32000, button
       //  should be pressed and not just bouncing
-      if (pressConfLvl > 32000)
+      if (pressConfLvl > 24000)
       {
         solderType = !solderType;
         // Reset the counter for the next button press
@@ -465,12 +479,20 @@ void Idle()
     ovenPID.SetSampleTime(SAMPLING_TIME);
     ovenPID.SetTunings(KP_PREHEAT, KI_PREHEAT, KD_PREHEAT);
     ovenPID.SetMode(AUTOMATIC);
-    DoControl();
-    digitalWrite(ledPin,LOW);
-    reflowStage = PROBE_CHECK;
+    if (asked)
+    {
+      DoControl();
+      reflowStage = PREHEAT_STAGE;
+    }
+    else
+    {
+      reflowStage = PROBE_CHECK;
+      CleanLCD();
+      detachInterrupt(startstopBttn);
+      attachInterrupt(startstopBttn, ProbeSet, FALLING);
+    }
     CleanLCD();
-    detatchInterrupt(startstopBttn);
-    attachInterrupt(startstopBttn, ProbeSet, FALLING);
+    digitalWrite(ledPin,LOW);
   }
 }
 
@@ -486,7 +508,7 @@ void Probe()
     pressConfLvl++;
     //  If by now the counter has reached 32000, button
     //  should be pressed and not just bouncing
-    if (pressConfLvl > 32000)
+    if (pressConfLvl > 24000)
     {
       probeOnBoard = !probeOnBoard;
       // Reset the counter for the next button press
@@ -494,18 +516,19 @@ void Probe()
     }
   }
 
-  if (doUpdate)
+/*  if (doUpdate)
   {
     Update();
   }
-
+*/
   if(probeState && probeOnBoard)
   {
-    reflowStage = PREHEAT_STAGE
+    reflowStage = PREHEAT_STAGE;
     CleanLCD();
-    detatchInterrupt(startstopBttn);
+    detachInterrupt(startstopBttn);
     attachInterrupt(startstopBttn, StartStop, FALLING);
     probeState = false;
+    asked = true;
   }
 }
 
@@ -517,6 +540,7 @@ void Probe()
 //    to move into the soaking stage.
 void Preheat()
 {
+  asked = true;
   DoControl();
   if ((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
@@ -546,6 +570,7 @@ void Preheat()
 void Soak()
 {
   DoControl();
+  asked = true;
   if ((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
@@ -577,6 +602,7 @@ void Soak()
 void Reflow()
 {
   DoControl();
+  asked = true;
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
@@ -604,6 +630,7 @@ void Cool()
   {
     reflowStage = COMPLETE_STAGE;
     CleanLCD();
+    asked = false;
   }
 }
 
@@ -621,6 +648,7 @@ void Complete()
   CleanLCD();
   ovenState = false;
   digitalWrite(relayPin, LOW);
+  asked = false;
 }
 
 //////////////////////////////////////////////
@@ -650,9 +678,9 @@ void Error()
 //    stage to IDLE_STAGE.
 void StartStop()
 {
-  delayMicroseconds(40000);
+  delayMicroseconds(30000);
   if(!digitalRead(startstopBttn))
-  {  
+  {
     ovenState = !ovenState;
     if(!ovenState)
     {
@@ -662,7 +690,6 @@ void StartStop()
     }
   }
 }
-
 //////////////////////////////////////////////
 // ProbeSet
 //    This function handles the software
@@ -671,7 +698,7 @@ void StartStop()
 //    probeState variable.
 void ProbeSet()
 {
-  delayMicroseconds(40000);
+  delayMicroseconds(30000);
   if(!digitalRead(startstopBttn))
   {  
     probeState = !probeState;
