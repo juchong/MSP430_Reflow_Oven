@@ -75,6 +75,7 @@
 *  1.0 - Initial release
 *  1.1 - Fix bug where oven does not go into ERROR state when thermocouple communication is lost
 *  1.2 - Optimized ISR tasks and LCD updating to avoid timing and memory issues.
+*  1.3 - Added a step to ask the user whether the thermocouple has been placed on the PCB.
 *
 ***************************************************************************************
 
@@ -227,7 +228,7 @@ void setup()
   lcd.begin(8, 2);
   lcd.createChar(1, degree);
   lcd.clear();
-  lcd.print("Reflow Oven 1.2");
+  lcd.print("Reflow Oven 1.3");
   lcd.setCursor(0,1);
   lcd.print("MSP430 - juchong");
   delay(2000);
@@ -236,7 +237,7 @@ void setup()
   // Begin Time Keeping
   //   Replace these with the relevant commands from Timer1 for Arduino
   //   to interrupt every 500 ms
-  TwoMsTimer::set(300, InterruptHandler);
+  TwoMsTimer::set(200, InterruptHandler);
   TwoMsTimer::start();
   
   // Attach START/STOP interrupt to the button
@@ -323,11 +324,11 @@ void UpdateLCD()
     {
       lcd.cursor(0,1);
       lcd.print("Yes?");
+    }
     else
-      {
-        lcd.cursor(0,1);
-        lcd.print("No? ");
-      }
+    {
+      lcd.cursor(0,1);
+      lcd.print("No? ");
     }
   }
   lcd.setCursor(0,1);
