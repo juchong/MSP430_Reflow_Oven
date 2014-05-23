@@ -117,6 +117,18 @@ typedef enum REFLOW_STAGE
   ERROR_PRESENT
 };
 
+typedef enum LAST_STAGE
+{
+  IDLE_STAGE,
+  PROBE_CHECK,
+  PREHEAT_STAGE,
+  SOAK_STAGE,
+  REFLOW_STAGE,
+  COOL_STAGE,
+  COMPLETE_STAGE,
+  ERROR_PRESENT
+}
+
 /* PID CONTROLLER PARAMETERS - VARIABLES */
 //  If your oven happens to be overshooting,
 //  increase the windowSize variable below.
@@ -183,6 +195,7 @@ int startstopBttn = 6;
 
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
+enum LAST_STAGE ref lastStage = COMPLETE_STAGE;
 boolean ovenState = false;
 boolean doUpdate = false;
 boolean probeState = false;
@@ -253,7 +266,7 @@ void setup()
 //    active.
 void loop()
 {
-  // The following if statement code ensures that the
+  // The following if statement ensures that the
   //  oven is in the IDLE_STAGE if set to off. It will
   //  also shut the oven off if it reaches 265C in error
   //  to prevent internal damage.
@@ -261,6 +274,14 @@ void loop()
   {
     ovenState = false;
     reflowStage = IDLE_STAGE;
+  }
+  if (lastStage == COMPLETE_STAGE)
+  {
+    ovenState = false;
+    doUpdate = false;
+    probeState = false;
+    probeOnBoard = false;
+    asked = false;
   }
   //DoControl();
   switch (reflowStage)
@@ -341,7 +362,6 @@ void UpdateLCD()
   }
 }
 
-
 //////////////////////////////////////////////
 // Interrupt Handler
 //    This simple function decides whether to
@@ -418,6 +438,7 @@ void DoControl()
 //    profile is chosen.
 void Idle()
 {  
+  lastStage = IDLE_STAGE;
   DoControl();
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
@@ -436,14 +457,13 @@ void Idle()
       pressConfLvl++;
       //  If by now the counter has reached 32000, button
       //  should be pressed and not just bouncing
-      if (pressConfLvl > 24000)
+      if (pressConfLvl > 22000)
       {
         solderType = !solderType;
         // Reset the counter for the next button press
         pressConfLvl = 0;
       }
     }
-
     if (doUpdate)
     {
       Update();
@@ -487,7 +507,6 @@ void Idle()
     else
     {
       reflowStage = PROBE_CHECK;
-      CleanLCD();
       detachInterrupt(startstopBttn);
       attachInterrupt(startstopBttn, ProbeSet, FALLING);
     }
@@ -495,7 +514,6 @@ void Idle()
     digitalWrite(ledPin,LOW);
   }
 }
-
 
 void Probe()
 {
@@ -508,7 +526,7 @@ void Probe()
     pressConfLvl++;
     //  If by now the counter has reached 32000, button
     //  should be pressed and not just bouncing
-    if (pressConfLvl > 24000)
+    if (pressConfLvl > 22000)
     {
       probeOnBoard = !probeOnBoard;
       // Reset the counter for the next button press
@@ -516,11 +534,6 @@ void Probe()
     }
   }
 
-/*  if (doUpdate)
-  {
-    Update();
-  }
-*/
   if(probeState && probeOnBoard)
   {
     reflowStage = PREHEAT_STAGE;
@@ -529,6 +542,7 @@ void Probe()
     attachInterrupt(startstopBttn, StartStop, FALLING);
     probeState = false;
     asked = true;
+    lastStage = IDLE_STAGE;
   }
 }
 
@@ -555,6 +569,7 @@ void Preheat()
     ovenPID.SetTunings(KP_SOAK, KI_SOAK, KD_SOAK);
     reflowStage = SOAK_STAGE;
     CleanLCD();
+    lastStage = IDLE_STAGE;
   }
 }
 
@@ -588,6 +603,7 @@ void Soak()
       setpoint = REFLOW_MAX;
       reflowStage = REFLOW_STAGE;
       CleanLCD();
+      lastStage = PREHEAT_STAGE;
     }
   }
 }
@@ -603,17 +619,21 @@ void Reflow()
 {
   DoControl();
   asked = true;
+
+  //ERROR CHECKING
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
     ovenState = false;
     return;
   }
+
   if (((REFLOW_MAX + 5) > input) && (input >= (REFLOW_MAX)))
   {
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
     CleanLCD();
+    lastStage = SOAK_STAGE;
   }
 }
 
@@ -626,11 +646,13 @@ void Cool()
 {
   DoControl();
   digitalWrite(ledPin, HIGH);
+  ovenState = false;
   if ((input <= 60) && (input > 50))
   {
     reflowStage = COMPLETE_STAGE;
     CleanLCD();
     asked = false;
+    lastStage = REFLOW_STAGE;
   }
 }
 
@@ -649,6 +671,7 @@ void Complete()
   ovenState = false;
   digitalWrite(relayPin, LOW);
   asked = false;
+  lastStage = COOL_STAGE;
 }
 
 //////////////////////////////////////////////
@@ -682,7 +705,11 @@ void StartStop()
   if(!digitalRead(startstopBttn))
   {
     ovenState = !ovenState;
-    if(!ovenState)
+    if (ovenState)
+    {
+      reflowStage = lastStage;
+    }
+    else
     {
       reflowStage = IDLE_STAGE;
       digitalWrite(ledPin, HIGH);
