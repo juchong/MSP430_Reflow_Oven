@@ -117,18 +117,6 @@ typedef enum REFLOW_STAGE
   ERROR_PRESENT
 };
 
-typedef enum LAST_STAGE
-{
-  IDLE_STAGE,
-  PROBE_CHECK,
-  PREHEAT_STAGE,
-  SOAK_STAGE,
-  REFLOW_STAGE,
-  COOL_STAGE,
-  COMPLETE_STAGE,
-  ERROR_PRESENT
-}
-
 /* PID CONTROLLER PARAMETERS - VARIABLES */
 //  If your oven happens to be overshooting,
 //  increase the windowSize variable below.
@@ -195,7 +183,7 @@ int startstopBttn = 6;
 
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
-enum LAST_STAGE ref lastStage = COMPLETE_STAGE;
+enum REFLOW_STAGE lastStage = COMPLETE_STAGE;
 boolean ovenState = false;
 boolean doUpdate = false;
 boolean probeState = false;
@@ -569,7 +557,7 @@ void Preheat()
     ovenPID.SetTunings(KP_SOAK, KI_SOAK, KD_SOAK);
     reflowStage = SOAK_STAGE;
     CleanLCD();
-    lastStage = IDLE_STAGE;
+    lastStage = PREHEAT_STAGE;
   }
 }
 
@@ -603,7 +591,7 @@ void Soak()
       setpoint = REFLOW_MAX;
       reflowStage = REFLOW_STAGE;
       CleanLCD();
-      lastStage = PREHEAT_STAGE;
+      lastStage = SOAK_STAGE;
     }
   }
 }
@@ -633,7 +621,7 @@ void Reflow()
     setpoint = COOL_MIN;
     reflowStage = COOL_STAGE;
     CleanLCD();
-    lastStage = SOAK_STAGE;
+    lastStage = REFLOW_STAGE;
   }
 }
 
@@ -652,7 +640,7 @@ void Cool()
     reflowStage = COMPLETE_STAGE;
     CleanLCD();
     asked = false;
-    lastStage = REFLOW_STAGE;
+    lastStage = COOL_STAGE;
   }
 }
 
@@ -671,7 +659,7 @@ void Complete()
   ovenState = false;
   digitalWrite(relayPin, LOW);
   asked = false;
-  lastStage = COOL_STAGE;
+  lastStage = COMPLETE_STAGE;
 }
 
 //////////////////////////////////////////////
