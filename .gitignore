@@ -11,3 +11,6 @@
 *.lai
 *.la
 *.a
+
+#Removing Mac Files
+*.DS_Store
