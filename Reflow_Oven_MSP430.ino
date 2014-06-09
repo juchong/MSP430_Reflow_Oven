@@ -1,9 +1,9 @@
 /***************************************************************************************
 *  Reflow Oven Controller for the TI MSP430 Launchpad
 *  Built for the TI MSP430G2553 Microcontroller
-*  Software Version: 1.3
-*  Date: 05-16-2014
-*  Code Author: Kristen Villemez
+*  Software Version: 1.4
+*  Date: 06-09-2014
+*  Code Author: Kristen Villemez, Juan Chong
 *  Hardware Design: Juan Chong
 *  Website: http://www.juanjchong.com/
 *  Last Updated By: Juan Chong
@@ -73,10 +73,12 @@
 *  REVISION HISTORY
 *  =================
 *  1.0 - Initial release
-*  1.1 - Fix bug where oven does not go into ERROR state when thermocouple communication is lost
+*  1.1 - Fix bug where oven does not go into ERROR state when thermocouple communication is lost.
 *  1.2 - Optimized ISR tasks and LCD updating to avoid timing and memory issues.
 *  1.3 - Added a step to ask the user whether the thermocouple has been placed on the PCB.
-*
+*  1.4 - Added a countdown to start reflow, fixed a bug where the oven keeps wanting to 
+          approach 50C after reflow, adjusted PID values, added asthetics to LCD, improved 
+          push button response, and cleaned up comments.
 ***************************************************************************************
 
 //////////////////////////////////////////////
@@ -100,9 +102,9 @@
 #define KI_SOAK 0.05
 #define KD_SOAK 250
 
-#define KP_REFLOW 350 // changed from 300
-#define KI_REFLOW 0.13 // changed from 0.05
-#define KD_REFLOW 400 // changed from 350
+#define KP_REFLOW 140 
+#define KI_REFLOW 0.025 
+#define KD_REFLOW 100 
 
 /* REFLOW STAGE DEFINITIONS */
 typedef enum REFLOW_STAGE
@@ -131,15 +133,15 @@ double ki;
 double kd;
 unsigned long timerSoak;
 
-/* LCD MESSAGES */
+/* LCD MESSAGES CORRESPONDING TO STAGE DEFINITIONS ABOVE*/
 const char* lcdStageMessages[] = {
-  "Solder Type",
+  "Solder Type:",
   "Probe On PCB?   ",
-  "PRE-HEATING...",
-  "SOAKING...",
-  "REFLOWING...",
-  "COOLING...",
-  "COMPLETE!",
+  "PRE-HEATING",
+  "SOAKING",
+  "REFLOWING",
+  "COOLING",
+  "COMPLETE",
   "SENSOR ERROR!"
 };
 
@@ -184,6 +186,8 @@ int startstopBttn = 6;
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 enum REFLOW_STAGE lastStage = COMPLETE_STAGE;
+int countdown = 0;
+int dot = 0;
 boolean ovenState = false;
 boolean doUpdate = false;
 boolean probeState = false;
@@ -198,19 +202,14 @@ LiquidCrystal lcd(lcdRs, lcdE, lcdD4, lcdD5, lcdD6, lcdD7);
 MAX31855 thermo(thermoSO, thermoCS, thermoCLK);
 
 /* DEFINING SOLDER TYPE VARIABLE*/
-/* true means lead, false means lead-free */
+/* True = Lead, False = Lead-Free */
 boolean solderType = true;
 
 //////////////////////////////////////////////
-//         BEGIN CODE METHOD BLOCKS         //
-//////////////////////////////////////////////
-
-//////////////////////////////////////////////
-// setup Function:
 // Sets pin modes and plays splash screen
 void setup()
 {
-  // Ensure oven relay is off
+  // Ensure oven relay is off when starting the controller
   digitalWrite(relayPin, LOW);
   pinMode(relayPin, OUTPUT);
   
@@ -221,24 +220,23 @@ void setup()
   pinMode(typeBttn, INPUT_PULLUP);
   pinMode(startstopBttn, INPUT_PULLUP);
   
-  // Setting LED Pin mode
+  // Setting LED Pin mode. Pin is active-high.
   pinMode(ledPin, OUTPUT);
-  // pin is active LOW
   digitalWrite(ledPin, HIGH);
   
   // Start-up Splash Screen
   lcd.begin(8, 2);
   lcd.createChar(1, degree);
   lcd.clear();
-  lcd.print("Reflow Oven 1.3");
-  lcd.setCursor(0,1);
-  lcd.print("MSP430 - juchong");
+  lcd.print("Reflow Oven 1.4");
+  lcd.setCursor(1,1);
+  lcd.print("juanjchong.com");
   delay(2000);
   lcd.clear();
   
   // Begin Time Keeping
-  //   Replace these with the relevant commands from Timer1 for Arduino
-  //   to interrupt every 500 ms
+  //  Replace these with the relevant commands from Timer1 
+  //  for arduino to interrupt every 200 ms.
   TwoMsTimer::set(200, InterruptHandler);
   TwoMsTimer::start();
   
@@ -263,6 +261,7 @@ void loop()
     ovenState = false;
     reflowStage = IDLE_STAGE;
   }
+  // Reset variables once a full reflow cycle has completed.
   if (lastStage == COMPLETE_STAGE)
   {
     ovenState = false;
@@ -271,7 +270,7 @@ void loop()
     probeOnBoard = false;
     asked = false;
   }
-  //DoControl();
+  // Main switch statement to handle mode selection.
   switch (reflowStage)
   {
     case IDLE_STAGE:
@@ -299,12 +298,12 @@ void loop()
       Error();
       break;
   }
-
+  // Call the global update if needed.
   if (doUpdate)
     Update();
 }
 
-// This function will clear the LCD. It will be called when changing reflow stages.
+// This function will clear the LCD.
 void CleanLCD()
 {
   lcd.clear();
@@ -321,13 +320,17 @@ void UpdateLCD()
   {
     if(solderType)
     {
-      lcd.print(" Pb  ");
+      lcd.print("Pb  ");
     }
     else
     {
-      lcd.print(" NoPb");
+      lcd.print("NoPb");
     }
   }
+
+//////////////////////////////////////
+//  Set up LCD messages for the Probe Check
+//  mode.
   if (reflowStage == PROBE_CHECK)
   {
     if (probeOnBoard)
@@ -340,9 +343,57 @@ void UpdateLCD()
       lcd.setCursor(0,1);
       lcd.print("No? ");
     }
+    if (countdown == 3)
+    {
+      lcd.setCursor(0,0);
+      lcd.print("Starting in 3...");
+      lcd.setCursor(0,1);
+      lcd.print("                ");
+    }
+    if (countdown == 2)
+    {
+      lcd.setCursor(0,0);
+      lcd.print("Starting in 2...");
+      lcd.setCursor(0,1);
+      lcd.print("                ");
+    }
+    if (countdown == 1)
+    {
+      lcd.setCursor(0,0);
+      lcd.print("Starting in 1...");
+      lcd.setCursor(0,1);
+      lcd.print("                ");
+    }
   }
+//////////////////////////////////////////
+//  Set up LCD status dots and manage a counter 
+//  to time and display them.
   if (reflowStage != PROBE_CHECK)
   {
+    if (reflowStage != IDLE_STAGE)
+    {
+      dot ++;
+      lcd.setCursor(0,0);
+      lcd.print(lcdStageMessages[reflowStage]);
+      if (dot == 4)
+      {
+        lcd.print(".  ");
+      }
+      if (dot == 8)
+      {
+        lcd.print(".. ");
+      }
+      if (dot == 12)
+      {
+        lcd.print("...");
+      }
+      if (dot == 14)
+      {
+        lcd.print("   ");
+        dot = 0;
+      }
+    }
+  // Display the temperature, degree symbol, and unit.
     lcd.setCursor(0,1);
     lcd.print(input);
     lcd.write(1);
@@ -352,23 +403,23 @@ void UpdateLCD()
 
 //////////////////////////////////////////////
 // Interrupt Handler
-//    This simple function decides whether to
-//    make the next computation (if oven state
-//    is true) or to ensure oven is switched
-//    off. It is called every 100ms as called
-//    by the watchdog timer in TwoMsTimer.
+//  This simple function decides whether to
+//  make the next computation (if oven state
+//  is true) or to ensure oven is switched
+//  off. It is called every 100ms as called
+//  by the watchdog timer in TwoMsTimer.
+//  
+//  If anything else needs to go in the ISR place it here
+//  else just call UpdateLCD from Loop.
+void InterruptHandler()
+{
+  doUpdate = true;
+}
 
-/* If anything else needs to go in the ISR place it here.
- * Else just call UpdateLCD from Loop */
 void Update()
 {
   UpdateLCD();
   doUpdate = false;
-}
-
-void InterruptHandler()
-{
-  doUpdate = true;
 }
 
 //////////////////////////////////////////////
@@ -382,38 +433,42 @@ void InterruptHandler()
 void DriveOutput()
 {
   //Serial.println(output);
-  if (reflowStage == PROBE_CHECK)
-  {
-    digitalWrite(relayPin,LOW);
-  }
-  else
+  if (reflowStage != PROBE_CHECK)
   {
     long now = millis();
     if(now - windowStartTime > windowSize)
-    { //time to shift the Relay Window
+     //Time to shift the Relay Window
       windowStartTime += windowSize;
-    }
     if(output > (now - windowStartTime))
-    {
       digitalWrite(relayPin,HIGH);
-    }
     else
-    {
       digitalWrite(relayPin,LOW);
-    }
   }
+  else
+      digitalWrite(relayPin,LOW);
+}
+
+//////////////////////////////////////////////
+// ReadTemp
+//    This function reads the temperature of the 
+//    sensor and places the value into the "input"
+//    variable.
+void ReadTemp()
+{
+input = thermo.readThermocouple(CELSIUS);
 }
 
 //////////////////////////////////////////////
 // Do Control
 //    This function performs all the basic PID
 //    function calls needed to control the
-//    oven properly.
+//    oven properly. It also decides whether to
+//    enable/disable the relay and checks for errors
 void DoControl()
 {
   if (reflowStage != PROBE_CHECK)
   {
-    input = thermo.readThermocouple(CELSIUS);
+    ReadTemp();
     ovenPID.Compute();
     DriveOutput();
   }
@@ -427,7 +482,7 @@ void DoControl()
 void Idle()
 {  
   lastStage = IDLE_STAGE;
-  DoControl();
+  ReadTemp();
   if((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
@@ -437,15 +492,14 @@ void Idle()
   {
     // Setting up temporary variable for debouncing
     int pressConfLvl = 0;
-
-    DoControl();
+    ReadTemp();
     while (!digitalRead(typeBttn))
     {
       // Increment button confidence counter
       pressConfLvl++;
-      //  If by now the counter has reached 32000, button
+      //  If by now the counter has reached 20000, button
       //  should be pressed and not just bouncing
-      if (pressConfLvl > 22000)
+      if (pressConfLvl > 20000)
       {
         solderType = !solderType;
         // Reset the counter for the next button press
@@ -453,10 +507,10 @@ void Idle()
       }
     }
     if (doUpdate)
-    {
       Update();
-    }
   }
+// Set the variables for the various set points of the 
+// program according to the mode selected.
   if(ovenState)
   {
     if (solderType)
@@ -487,6 +541,10 @@ void Idle()
     ovenPID.SetSampleTime(SAMPLING_TIME);
     ovenPID.SetTunings(KP_PREHEAT, KI_PREHEAT, KD_PREHEAT);
     ovenPID.SetMode(AUTOMATIC);
+
+  // Monitor the variable in case a cycle was stopped
+  // mid-reflow. In case it is, skip asking whether the
+  // temperature probe is on the PCB.
     if (asked)
     {
       DoControl();
@@ -503,18 +561,21 @@ void Idle()
   }
 }
 
+///////////////////////////////////
+// Probe
+//  Ask the user whether the probe is on the PCB or not.
+//  IF IT IS NOT, YOU WILL DAMAGE YOUR PCB!!
 void Probe()
 {
   // Setting up temporary variable for debouncing
   int pressConfLvl = 0;
-
   while (!digitalRead(typeBttn))
   {
     // Increment button confidence counter
     pressConfLvl++;
-    //  If by now the counter has reached 32000, button
+    //  If by now the counter has reached 20000, button
     //  should be pressed and not just bouncing
-    if (pressConfLvl > 22000)
+    if (pressConfLvl > 20000)
     {
       probeOnBoard = !probeOnBoard;
       // Reset the counter for the next button press
@@ -522,14 +583,28 @@ void Probe()
     }
   }
 
+  // If the probe is on the PCB and the start button have both been pressed,
+  // proceed with the reflow cycle.
   if(probeState && probeOnBoard)
   {
-    reflowStage = PREHEAT_STAGE;
     CleanLCD();
     detachInterrupt(startstopBttn);
     attachInterrupt(startstopBttn, StartStop, FALLING);
     probeState = false;
     asked = true;
+    //Begin countdown after the probe is set and cycle started.
+    //This in part is to avoid rushing through the menu.
+    countdown = 3;
+    UpdateLCD();
+    delay(1000);
+    countdown = 2;
+    UpdateLCD();
+    delay(1000);
+    countdown = 1;
+    UpdateLCD();
+    delay(1000);
+    CleanLCD();
+    reflowStage = PREHEAT_STAGE;
     lastStage = IDLE_STAGE;
   }
 }
@@ -544,6 +619,9 @@ void Preheat()
 {
   asked = true;
   DoControl();
+  countdown = 0;
+
+  //ERROR CHECKING
   if ((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
@@ -574,13 +652,14 @@ void Soak()
 {
   DoControl();
   asked = true;
+
+  //ERROR CHECKING
   if ((input == FAULT_OPEN) || (input == FAULT_SHORT_GND) || (input == FAULT_SHORT_VCC) || (input < 5))
   {
     reflowStage = ERROR_PRESENT;
     ovenState = false;
     return;
   }
-
   if (millis() > timerSoak)
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
@@ -615,7 +694,6 @@ void Reflow()
     ovenState = false;
     return;
   }
-
   if (((REFLOW_MAX + 5) > input) && (input >= (REFLOW_MAX)))
   {
     setpoint = COOL_MIN;
@@ -634,12 +712,11 @@ void Cool()
 {
   DoControl();
   digitalWrite(ledPin, HIGH);
-  ovenState = false;
   if ((input <= 60) && (input > 50))
   {
     reflowStage = COMPLETE_STAGE;
     CleanLCD();
-    asked = false;
+    asked = true;
     lastStage = COOL_STAGE;
   }
 }
@@ -650,10 +727,11 @@ void Cool()
 //    time to display the fact that the
 //    process is complete so the user knows
 //    they can take the soldered boards out
-//    of the oven.
+//    of the oven. Maybe in the next revision
+//    of the hardware I'll add a buzzer?
 void Complete()
 {
-  delay(3000);
+  delay(2500);
   reflowStage = IDLE_STAGE;
   CleanLCD();
   ovenState = false;
@@ -689,14 +767,12 @@ void Error()
 //    stage to IDLE_STAGE.
 void StartStop()
 {
-  delayMicroseconds(30000);
+  delayMicroseconds(20000);
   if(!digitalRead(startstopBttn))
   {
     ovenState = !ovenState;
-    if (ovenState)
-    {
+    if (!ovenState)
       reflowStage = lastStage;
-    }
     else
     {
       reflowStage = IDLE_STAGE;
@@ -713,9 +789,7 @@ void StartStop()
 //    probeState variable.
 void ProbeSet()
 {
-  delayMicroseconds(30000);
-  if(!digitalRead(startstopBttn))
-  {  
+  delayMicroseconds(20000);
+  if (!digitalRead(startstopBttn))
     probeState = !probeState;
-  }
 }
