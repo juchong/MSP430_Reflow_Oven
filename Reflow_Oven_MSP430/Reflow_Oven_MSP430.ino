@@ -1,7 +1,7 @@
 /***************************************************************************************
 *  Reflow Oven Controller for the TI MSP430 Launchpad
 *  Built for the TI MSP430G2553 Microcontroller
-*  Software Version: 1.4
+*  Software Version: 1.5
 *  Date: 06-09-2014
 *  Code Author: Kristen Villemez, Juan Chong
 *  Hardware Design: Juan Chong
@@ -77,8 +77,10 @@
 *  1.2 - Optimized ISR tasks and LCD updating to avoid timing and memory issues.
 *  1.3 - Added a step to ask the user whether the thermocouple has been placed on the PCB.
 *  1.4 - Added a countdown to start reflow, fixed a bug where the oven keeps wanting to 
-          approach 50C after reflow, adjusted PID values, added asthetics to LCD, improved 
-          push button response, and cleaned up comments.
+*         approach 50C after reflow, adjusted PID values, added asthetics to LCD, improved 
+*         push button response, and cleaned up comments.
+*  1.5 - Added error handling and guardbanding for probe measurements, added and updated comments, improved
+*         program flow and removed unused variables.
 ***************************************************************************************
 
 //////////////////////////////////////////////
@@ -237,7 +239,7 @@ void setup()
   lcd.begin(8, 2);
   lcd.createChar(1, degree);
   lcd.clear();
-  lcd.print("Reflow Oven 1.4");
+  lcd.print("Reflow Oven 1.5");
   lcd.setCursor(0,1);
   lcd.print("juanjchong.com");
   delay(2500);
@@ -313,13 +315,9 @@ void UpdateLCD()
   if (reflowStage == IDLE_STAGE)
   {
     if(solderType)
-    {
       lcd.print("Pb  ");
-    }
     else
-    {
       lcd.print("NoPb");
-    }
   }
 //////////////////////////////////////
 //  Set up LCD messages for the Probe Check
@@ -369,17 +367,11 @@ void UpdateLCD()
       lcd.setCursor(0,0);
       lcd.print(lcdStageMessages[reflowStage]);
       if (dot == 4)
-      {
         lcd.print(".  ");
-      }
       if (dot == 8)
-      {
         lcd.print(".. ");
-      }
       if (dot == 12)
-      {
         lcd.print("...");
-      }
       if (dot == 16)
       {
         lcd.print("   ");
@@ -435,11 +427,9 @@ void Update()
 //    value of the PID controller to see if
 //    relay should be turned on. If it is,
 //    this turns the relay on/off
-//    appropriately. It also prints out the
-//    current temperature and reflow stage.
+//    appropriately. 
 void DriveOutput()
 {
-  //Serial.println(output);
   if ((reflowStage != PROBE_CHECK) || (reflowStage != ERROR_PRESENT))
   {
     long now = millis();
@@ -459,7 +449,8 @@ void DriveOutput()
 // ReadTemp
 //    This function reads the temperature of the 
 //    sensor and places the value into the "input"
-//    variable.
+//    variable. If in the IDLE_STAGE, it will
+//    also display an Error message on the LCD.
 void ReadTemp()
 {
   input = thermo.readThermocouple(CELSIUS);
@@ -484,6 +475,20 @@ void DoControl()
   }
 }
 
+///////////////////////////////////////////////
+// ErrorCheck
+//    This function will check certain guardbands to
+//    determine whether the temperature probe is
+//    in an error state or not. If the probe
+//    measurement is outside of the guardbands, the 
+//    previous "good" value will be preserved and
+//    fed to the PID loop. If there are multiple
+//    consecutive errors, a counter will increment.
+//    If this counter reaches the threshold, the 
+//    program will jump to an error state and shut 
+//    down the reflow cycle.
+//    This counter also resets after a set amount of
+//    time to avoid "one-time" errors.
 void ErrorCheck()
 {
   if (reflowStage != IDLE_STAGE)
@@ -514,6 +519,13 @@ void ErrorCheck()
   }
 }
 
+/////////////////////////////////////////////////
+// ErrorDispOnly
+//    This function is similar to the ErrorCheck()
+//    function but will not jump to the ERROR_PRESENT
+//    stage. This function is only called in the
+//    IDLE_STAGE and is meant to give the user some
+//    feedback on probe placement.
 void ErrorDispOnly()
 {
   if ((input > 20) && (input <= 265))
@@ -549,19 +561,15 @@ void Idle()
   ReadTemp();
   while (!ovenState)
   {
-    // Setting up temporary variable for debouncing
+    // Button Debouncing
     int pressConfLvl = 0;
     ReadTemp();
     while (!digitalRead(typeBttn))
     {
-      // Increment button confidence counter
       pressConfLvl++;
-      //  If by now the counter has reached 20000, button
-      //  should be pressed and not just bouncing
       if (pressConfLvl > 20000)
       {
         solderType = !solderType;
-        // Reset the counter for the next button press
         pressConfLvl = 0;
       }
     }
@@ -626,19 +634,15 @@ void Idle()
 //  IF IT IS NOT, YOU WILL DAMAGE YOUR PCB!!
 void Probe()
 {
-  // Setting up temporary variable for debouncing
+  // Switch Debouncing
   ReadTemp();
   int pressConfLvl = 0;
   while (!digitalRead(typeBttn))
   {
-    // Increment button confidence counter
     pressConfLvl++;
-    //  If by now the counter has reached 20000, button
-    //  should be pressed and not just bouncing
     if (pressConfLvl > 20000)
     {
       probeOnBoard = !probeOnBoard;
-      // Reset the counter for the next button press
       pressConfLvl = 0;
     }
   }
@@ -652,19 +656,16 @@ void Probe()
     attachInterrupt(startstopBttn, StartStop, FALLING);
     probeState = false;
     asked = true;
-    //Begin countdown after the probe is set and cycle started.
-    //This in part is to avoid rushing through the menu.
+    // Begin countdown after the probe is set and cycle started.
+    // This in part is to avoid rushing through the menu.
     CleanLCD();
     countdown = 3;
-    UpdateLCD();
     delay(1000);
     CleanLCD();
     countdown = 2;
-    UpdateLCD();
     delay(1000);
     CleanLCD();
     countdown = 1;
-    UpdateLCD();
     delay(1000);
     CleanLCD();
     reflowStage = PREHEAT_STAGE;
@@ -740,18 +741,19 @@ void Reflow()
 
 //////////////////////////////////////////////
 // Cool
-//    This essentially just waits for the
-//    oven temperature to reach a level safe
-//    enough to open the door.
+//    This mode just waits until the temperature
+//    of the oven is below 50C. In a future
+//    hardware revision this may contain buzzer
+//    and fan control code.
 void Cool()
 {
   DoControl();
+  asked = true;
   digitalWrite(ledPin, HIGH);
   if ((input <= 60) && (input > 50))
   {
     reflowStage = COMPLETE_STAGE;
     CleanLCD();
-    asked = true;
   }
 }
 
@@ -761,8 +763,10 @@ void Cool()
 //    time to display the fact that the
 //    process is complete so the user knows
 //    they can take the soldered boards out
-//    of the oven. Maybe in the next revision
-//    of the hardware I'll add a buzzer?
+//    of the oven. I also clean up variables
+//    used during reflow.
+//    Maybe in the next revision of the hardware 
+//    I'll add a buzzer?
 void Complete()
 {
   ovenState = false;
@@ -779,28 +783,25 @@ void Complete()
 // Error
 //    This function alerts the user that there
 //    was an error in reading the thermocouple
-//    temperature. Either the thermocouple is
-//    disconnected or something else is wrong.
+//    temperature. They are given the option of
+//    continuing the cycle, or resetting all 
+//    variables and returning to IDLE_STAGE.
 void Error()
 {
   digitalWrite(relayPin,LOW);
   digitalWrite(ledPin,HIGH);
-    // Setting up temporary variable for debouncing
+  // Switch Debouncing
   int pressConfLvl = 0;
   while (!digitalRead(typeBttn))
   {
-    // Increment button confidence counter
     pressConfLvl++;
-    //  If by now the counter has reached 20000, button
-    //  should be pressed and not just bouncing
     if (pressConfLvl > 20000)
     {
       continueWithError = !continueWithError;
-      // Reset the counter for the next button press
       pressConfLvl = 0;
     }
   }
-  // If you answer yes to continuing...
+  // If you answer yes, continue where you left off.
   if (continueState && continueWithError)
   {
     CleanLCD();
@@ -808,10 +809,10 @@ void Error()
     detachInterrupt(startstopBttn);
     attachInterrupt(startstopBttn, StartStop, FALLING);
     reflowStage = stoppedStage;
-    continueState = !continueState;
-    continueWithError = !continueWithError;
+    continueState = false;
+    continueWithError = false;
   }
-  //If you answer no to continuing (I.E. Resetting)
+  //If you answer no, reset variables and go back to IDLE_STAGE.
   if (continueState && !continueWithError)
   {
     reflowStage = IDLE_STAGE;
@@ -820,16 +821,17 @@ void Error()
     doUpdate = false;
     probeState = false;
     probeOnBoard = false;
-    continueState = !continueState;
-    continueWithError = !continueWithError;
+    continueState = false;
+    continueWithError = false;
     CleanLCD();
     delay(100);
     detachInterrupt(startstopBttn);
     attachInterrupt(startstopBttn, StartStop, FALLING);
   }
 }
-
-//////////////////////////////////////////////
+//////////////////////////////////
+//// INTERRUPT-DRIVEN FUNCTIONS //
+//////////////////////////////////
 // StartStop
 //    This function handles the software
 //    debouncing of the Start/Stop button, as
@@ -843,8 +845,10 @@ void StartStop()
   if (!digitalRead(startstopBttn))
     ovenState = !ovenState;
   if (reflowStage != IDLE_STAGE)
+  {
     reflowStage = IDLE_STAGE;
     killReflow = true;
+  }
 }
 //////////////////////////////////////////////
 // ProbeSet
@@ -858,7 +862,12 @@ void ProbeSet()
   if (!digitalRead(startstopBttn))
     probeState = !probeState;
 }
-
+/////////////////////////////////////////////
+// ErrorChoice
+//    This function works just like the ProbeSet
+//    function in that it debounces the Start/Stop
+//    button and inverts the continueState 
+//    variable. Menu selection is handled elsewhere.
 void ErrorChoice()
 {
   delayMicroseconds(20000);
