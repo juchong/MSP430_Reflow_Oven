@@ -196,6 +196,12 @@ boolean probeOnBoard = false;
 boolean continueWithError = false;
 boolean continueState = false;
 boolean asked = false;
+boolean errorFound = false;
+
+/* ERROR HANDLING DEFINITIONS */
+double inputOld = 0;
+int errorTimer = 0;
+int errorCounter = 0;
 
 /* INSTANTIATE PID CONTROLLER */
 PID ovenPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
@@ -299,8 +305,11 @@ void CleanLCD()
 // clear the LCD, but instead overwrites data present on the display previously.
 void UpdateLCD()
 {   
-  lcd.setCursor(0,0);
-  lcd.print(lcdStageMessages[reflowStage]);
+  if (countdown == 0)
+  {
+    lcd.setCursor(0,0);
+    lcd.print(lcdStageMessages[reflowStage]);
+  }
   if (reflowStage == IDLE_STAGE)
   {
     if(solderType)
@@ -349,19 +358,10 @@ void UpdateLCD()
       lcd.print("                ");
     }
   }
-  if (reflowStage == ERROR_PRESENT)
-  {
-    lcd.setCursor(0,1);
-    lcd.write("Continue? ");
-    if (continueWithError)
-      lcd.write("Yes");
-    else
-      lcd.write("No");
-  }
 //////////////////////////////////////////
 //  Set up LCD status dots and manage a counter 
 //  to time and display them.
-  if (reflowStage != PROBE_CHECK)
+  if ((reflowStage != PROBE_CHECK) || (reflowStage != ERROR_PRESENT))
   {
     if (reflowStage != IDLE_STAGE)
     {
@@ -386,11 +386,25 @@ void UpdateLCD()
         dot = 0;
       }
     }
-  // Display the temperature, degree symbol, and unit.
+  }
+  if ((reflowStage == ERROR_PRESENT) && (reflowStage != PROBE_CHECK))
+  {
+    lcd.setCursor(0,1);
+    lcd.write("Continue? ");
+    if (continueWithError)
+      lcd.write("Yes   ");
+    else
+      lcd.write("No    ");
+  }
+  if ((reflowStage != ERROR_PRESENT) && (reflowStage != PROBE_CHECK))
+  {
     lcd.setCursor(0,1);
     lcd.print(input);
     lcd.write(1);
-    lcd.print("C         ");
+    if ((errorCounter > 0) || errorFound)
+      lcd.print("C - Error ");
+    else
+      lcd.print("C         ");
   }
 }
 
@@ -449,6 +463,8 @@ void DriveOutput()
 void ReadTemp()
 {
   input = thermo.readThermocouple(CELSIUS);
+  if (reflowStage == IDLE_STAGE)
+    ErrorDispOnly();
 }
 
 //////////////////////////////////////////////
@@ -470,15 +486,50 @@ void DoControl()
 
 void ErrorCheck()
 {
-  if (reflowStage != ERROR_PRESENT)
+  if (reflowStage != IDLE_STAGE)
   {
-    if ((input < 0) || (input >= 280))
+    if ((errorCounter < 200) && (input > 20) && (input <= 265))
     {
-      stoppedStage = reflowStage;
-      reflowStage = ERROR_PRESENT;
-      detachInterrupt(startstopBttn);
-      attachInterrupt(startstopBttn, ErrorChoice, FALLING);
+      inputOld = input;
+      errorTimer ++;
     }
+    if ((input < 20) || (input >= 265))
+      {
+        errorCounter ++;
+        input = inputOld;
+      }
+    if (errorTimer > 4000)
+    {
+      errorTimer = 0;
+      errorCounter = 0;
+    }
+    if (errorCounter >= 200)
+    {
+        errorCounter = 0;
+        stoppedStage = reflowStage;
+        reflowStage = ERROR_PRESENT;
+        detachInterrupt(startstopBttn);
+        attachInterrupt(startstopBttn, ErrorChoice, FALLING);
+    }
+  }
+}
+
+void ErrorDispOnly()
+{
+  if ((input > 20) && (input <= 265))
+  {
+    inputOld = input;
+    errorTimer ++;
+  }
+  if ((input < 20) || (input >= 265))
+  {
+    input = inputOld;
+    errorFound = true;
+  }
+  if (errorTimer > 1000)
+  {
+    errorTimer = 0;
+    errorFound = false;
   }
 }
 
@@ -603,12 +654,15 @@ void Probe()
     asked = true;
     //Begin countdown after the probe is set and cycle started.
     //This in part is to avoid rushing through the menu.
+    CleanLCD();
     countdown = 3;
     UpdateLCD();
     delay(1000);
+    CleanLCD();
     countdown = 2;
     UpdateLCD();
     delay(1000);
+    CleanLCD();
     countdown = 1;
     UpdateLCD();
     delay(1000);
@@ -719,7 +773,6 @@ void Complete()
   doUpdate = false;
   probeState = false;
   probeOnBoard = false;
-  asked = false;
 }
 
 //////////////////////////////////////////////
@@ -747,6 +800,7 @@ void Error()
       pressConfLvl = 0;
     }
   }
+  // If you answer yes to continuing...
   if (continueState && continueWithError)
   {
     CleanLCD();
@@ -756,6 +810,22 @@ void Error()
     reflowStage = stoppedStage;
     continueState = !continueState;
     continueWithError = !continueWithError;
+  }
+  //If you answer no to continuing (I.E. Resetting)
+  if (continueState && !continueWithError)
+  {
+    reflowStage = IDLE_STAGE;
+    ovenState = false;
+    asked = false;
+    doUpdate = false;
+    probeState = false;
+    probeOnBoard = false;
+    continueState = !continueState;
+    continueWithError = !continueWithError;
+    CleanLCD();
+    delay(100);
+    detachInterrupt(startstopBttn);
+    attachInterrupt(startstopBttn, StartStop, FALLING);
   }
 }
 
