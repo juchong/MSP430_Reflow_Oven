@@ -188,7 +188,6 @@ int startstopBttn = 6;
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 enum REFLOW_STAGE stoppedStage = IDLE_STAGE;
-int countdown = 0;
 int dot = 0;
 boolean killReflow = false;
 boolean ovenState = false;
@@ -307,11 +306,8 @@ void CleanLCD()
 // clear the LCD, but instead overwrites data present on the display previously.
 void UpdateLCD()
 {   
-  if (countdown == 0)
-  {
-    lcd.setCursor(0,0);
-    lcd.print(lcdStageMessages[reflowStage]);
-  }
+  lcd.setCursor(0,0);
+  lcd.print(lcdStageMessages[reflowStage]);
   if (reflowStage == IDLE_STAGE)
   {
     if(solderType)
@@ -333,27 +329,6 @@ void UpdateLCD()
     {
       lcd.setCursor(0,1);
       lcd.print("No? ");
-    }
-    if (countdown == 3)
-    {
-      lcd.setCursor(0,0);
-      lcd.print("Starting in 3...");
-      lcd.setCursor(0,1);
-      lcd.print("                ");
-    }
-    if (countdown == 2)
-    {
-      lcd.setCursor(0,0);
-      lcd.print("Starting in 2...");
-      lcd.setCursor(0,1);
-      lcd.print("                ");
-    }
-    if (countdown == 1)
-    {
-      lcd.setCursor(0,0);
-      lcd.print("Starting in 1...");
-      lcd.setCursor(0,1);
-      lcd.print("                ");
     }
   }
 //////////////////////////////////////////
@@ -656,18 +631,6 @@ void Probe()
     attachInterrupt(startstopBttn, StartStop, FALLING);
     probeState = false;
     asked = true;
-    // Begin countdown after the probe is set and cycle started.
-    // This in part is to avoid rushing through the menu.
-    CleanLCD();
-    countdown = 3;
-    delay(1000);
-    CleanLCD();
-    countdown = 2;
-    delay(1000);
-    CleanLCD();
-    countdown = 1;
-    delay(1000);
-    CleanLCD();
     reflowStage = PREHEAT_STAGE;
   }
 }
@@ -682,7 +645,6 @@ void Preheat()
 {
   DoControl();
   asked = true;
-  countdown = 0;
   if (((SOAK_MIN + 5) > input) && (input >= SOAK_MIN))
   {
     timerSoak = millis() + SOAK_MICRO_PERIOD;
