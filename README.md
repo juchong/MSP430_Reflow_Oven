@@ -1,7 +1,7 @@
 Reflow Oven Controller for the TI MSP430 Launchpad
 ========
 +  Built for the TI MSP430G2553 Microcontroller
-+  Software Version: 1.4
++  Software Version: 1.5
 +  Date: 06-09-2014
 +  Code Author: Kristen Villemez, Juan Chong
 +  Hardware Design: Juan Chong
@@ -84,3 +84,5 @@ Revision History
 1.3 - Added a step to ask the user whether the thermocouple has been placed on the PCB.
 
 1.4 - Added a countdown to start reflow, fixed a bug where the oven keeps wanting to approach 50C after reflow, adjusted PID values, added asthetics to LCD, improved push button response, and cleaned up comments.
+
+1.5 - Added error handling and guardbanding for probe measurements, added and updated comments, improved program flow and removed unused variables.
