@@ -188,6 +188,7 @@ int startstopBttn = 6;
 /* STATE VARIABLE INSTANTIATIONS */
 enum REFLOW_STAGE reflowStage = IDLE_STAGE;
 enum REFLOW_STAGE stoppedStage = IDLE_STAGE;
+enum REFLOW_STAGE errorStage = IDLE_STAGE;
 int dot = 0;
 boolean killReflow = false;
 boolean ovenState = false;
@@ -336,7 +337,7 @@ void UpdateLCD()
 //  to time and display them.
   if ((reflowStage != PROBE_CHECK) || (reflowStage != ERROR_PRESENT))
   {
-    if (reflowStage != IDLE_STAGE)
+    if ((reflowStage != IDLE_STAGE) && (reflowStage != ERROR_PRESENT)) 
     {
       dot ++;
       lcd.setCursor(0,0);
@@ -486,7 +487,7 @@ void ErrorCheck()
     if (errorCounter >= 200)
     {
         errorCounter = 0;
-        stoppedStage = reflowStage;
+        errorStage = reflowStage;
         reflowStage = ERROR_PRESENT;
         detachInterrupt(startstopBttn);
         attachInterrupt(startstopBttn, ErrorChoice, FALLING);
@@ -587,16 +588,19 @@ void Idle()
   // Monitor the variable in case a cycle was stopped
   // mid-reflow. In case it was, skip asking whether the
   // temperature probe is on the PCB.
-    if (asked)
-    {
-      DoControl();
-      reflowStage = PREHEAT_STAGE;
-    }
-    else
-    {
+    if (!asked)
+    {   
       reflowStage = PROBE_CHECK;
       detachInterrupt(startstopBttn);
       attachInterrupt(startstopBttn, ProbeSet, FALLING);
+    }
+    else
+    {
+      if (stoppedStage != IDLE_STAGE)
+      {
+        reflowStage = stoppedStage;
+        stoppedStage = IDLE_STAGE;
+      }
     }
     CleanLCD();
     digitalWrite(ledPin,LOW);
@@ -770,7 +774,7 @@ void Error()
     delay(100);
     detachInterrupt(startstopBttn);
     attachInterrupt(startstopBttn, StartStop, FALLING);
-    reflowStage = stoppedStage;
+    reflowStage = errorStage;
     continueState = false;
     continueWithError = false;
   }
@@ -808,6 +812,7 @@ void StartStop()
     ovenState = !ovenState;
   if (reflowStage != IDLE_STAGE)
   {
+    stoppedStage = reflowStage;
     reflowStage = IDLE_STAGE;
     killReflow = true;
   }
